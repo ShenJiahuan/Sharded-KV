@@ -1,0 +1,62 @@
+syntax = "proto3";
+option java_multiple_files = true;
+package com.shenjiahuan;
+
+message Server {
+  string host = 1;
+  int32 port = 2;
+}
+
+message ServerList {
+  repeated Server server = 1;
+}
+
+message JoinRequest {
+  int64 gid = 1;
+  ServerList server = 2;
+  int64 clientId = 3;
+  int64 seqId = 4;
+}
+
+message JoinResponse {
+  int32 status = 1;
+}
+
+message LeaveRequest {
+  int64 gid = 1;
+  int64 clientId = 2;
+  int64 seqId = 3;
+}
+
+message LeaveResponse {
+  int32 status = 1;
+}
+
+message QueryRequest {
+  int32 version = 1;
+  int64 clientId = 2;
+  int64 seqId = 3;
+}
+
+message QueryResponse {
+  int32 status = 1;
+  string data = 2;
+}
+
+message MoveRequest {
+  int64 shardId = 1;
+  int64 gid = 2;
+  int64 clientId = 3;
+  int64 seqId = 4;
+}
+
+message MoveResponse {
+  int32 status = 1;
+}
+
+service MasterService {
+  rpc join(JoinRequest) returns (JoinResponse);
+  rpc leave(LeaveRequest) returns (LeaveResponse);
+  rpc query(QueryRequest) returns (QueryResponse);
+  rpc move(MoveRequest) returns (MoveResponse);
+}
