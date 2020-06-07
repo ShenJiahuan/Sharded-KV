@@ -18,7 +18,7 @@ public class MasterConfig {
   private final List<JsonObject> historyGroupMap = new ArrayList<>();
   private final List<JsonObject> historyShardMap = new ArrayList<>();
 
-  public static final Long SHARD_COUNT = 256L;
+  public static final Long SHARD_COUNT = 64L;
 
   public void addGroup(Long gid, List<Server> serverList) {
     mutex.lock();
@@ -111,7 +111,7 @@ public class MasterConfig {
 
   private void reshardByRemove(Long gidToRemove) {
     if (shardMap.size() == 1) {
-      logger.error("Remove last group will cause service unavailable and data loss");
+      logger.warn("Remove last group will cause service unavailable and data loss");
     } else {
       Long gidAffected =
           shardMap

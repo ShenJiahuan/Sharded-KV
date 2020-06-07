@@ -81,8 +81,9 @@ public class MasterTest {
 
     String[] queryResult = new String[6];
     MasterClient client = config.createClient();
+    final int nParallelClient = 10;
 
-    System.out.println("Test: Basic leave/join ...\n");
+    System.out.println("Test: Basic leave/join ...");
     {
       check(client, new HashSet<>(Collections.emptyList()));
       queryResult[0] = client.query(-1);
@@ -143,13 +144,12 @@ public class MasterTest {
       check(client, new HashSet<>(Collections.singletonList(gid2)));
       queryResult[4] = client.query(-1);
 
-      client.leave(gid1);
-      check(client, new HashSet<>(Collections.singletonList(gid2)));
+      client.leave(gid2);
       queryResult[5] = client.query(-1);
     }
-    System.out.println("  ... Passed\n");
+    System.out.println("  ... Passed");
 
-    System.out.println("Test: Historical queries ...\n");
+    System.out.println("Test: Historical queries ...");
     {
       for (int i = 0; i < config.getnMasters(); i++) {
         config.shutDownMaster(i);
@@ -160,9 +160,9 @@ public class MasterTest {
         config.startMaster(i);
       }
     }
-    System.out.println("  ... Passed\n");
+    System.out.println("  ... Passed");
 
-    System.out.println("Test: Move ...\n");
+    System.out.println("Test: Move ...");
     {
       long gid3 = 503;
       client.join(
@@ -211,22 +211,20 @@ public class MasterTest {
       client.leave(gid3);
       client.leave(gid4);
     }
-    System.out.println("  ... Passed\n");
+    System.out.println("  ... Passed");
 
-    System.out.println("Test: Concurrent leave/join ...\n");
+    System.out.println("Test: Concurrent leave/join ...");
     {
-      final int nClient = 10;
-      MasterClient[] clients = new MasterClient[nClient];
+      MasterClient[] clients = new MasterClient[nParallelClient];
 
-      for (int i = 0; i < nClient; i++) {
+      for (int i = 0; i < nParallelClient; i++) {
         clients[i] = config.createClient();
       }
 
-      Thread[] threads = new Thread[nClient];
+      Thread[] threads = new Thread[nParallelClient];
       Set<Long> gids = new ConcurrentSkipListSet<>();
-      gids.add(2L);
-      for (int i = 0; i < nClient; i++) {
-        int finalI = i;
+      for (int i = 0; i < nParallelClient; i++) {
+        final int finalI = i;
         threads[i] =
             new Thread(
                 () -> {
@@ -247,7 +245,7 @@ public class MasterTest {
                 });
         threads[i].start();
       }
-      for (int i = 0; i < nClient; i++) {
+      for (int i = 0; i < nParallelClient; i++) {
         try {
           threads[i].join();
         } catch (InterruptedException e) {
@@ -256,6 +254,6 @@ public class MasterTest {
       }
       check(client, gids);
     }
-    System.out.println("  ... Passed\n");
+    System.out.println("  ... Passed");
   }
 }
