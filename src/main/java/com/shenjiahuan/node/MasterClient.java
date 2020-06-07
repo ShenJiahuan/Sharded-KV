@@ -133,14 +133,16 @@ public class MasterClient {
                     .build());
 
         logger.info("Response received from server:\n" + queryResponse);
-        channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
       } catch (StatusRuntimeException e) {
         logger.info("Fail to get response from server");
         this.leader = (this.leader + 1) % masters.size();
         continue;
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        throw new RuntimeException(e);
+      } finally {
+        try {
+          channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
       }
 
       if (queryResponse.getStatus() == 0) {
