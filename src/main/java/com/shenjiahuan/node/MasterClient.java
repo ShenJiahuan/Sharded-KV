@@ -1,6 +1,7 @@
 package com.shenjiahuan.node;
 
 import com.shenjiahuan.*;
+import com.shenjiahuan.util.Pair;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
@@ -52,16 +53,17 @@ public class MasterClient {
                     .setSeqId(seqId)
                     .build());
 
-        logger.info("Response received from server:\n" + joinResponse);
-        channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-        ;
+        //        logger.info("Response received from server:\n" + joinResponse);
       } catch (StatusRuntimeException e) {
         logger.info("Fail to get response from server");
         this.leader = (this.leader + 1) % masters.size();
         continue;
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        throw new RuntimeException(e);
+      } finally {
+        try {
+          channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
       }
 
       if (joinResponse.getStatus() == 0) {
@@ -92,16 +94,17 @@ public class MasterClient {
                     .setSeqId(seqId)
                     .build());
 
-        logger.info("Response received from server:\n" + leaveResponse);
-        channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-        ;
+        //        logger.info("Response received from server:\n" + leaveResponse);
       } catch (StatusRuntimeException e) {
         logger.info("Fail to get response from server");
         this.leader = (this.leader + 1) % masters.size();
         continue;
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        throw new RuntimeException(e);
+      } finally {
+        try {
+          channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
       }
 
       if (leaveResponse.getStatus() == 0) {
@@ -132,7 +135,7 @@ public class MasterClient {
                     .setSeqId(seqId)
                     .build());
 
-        logger.info("Response received from server:\n" + queryResponse);
+        //        logger.info("Response received from server:\n" + queryResponse);
       } catch (StatusRuntimeException e) {
         logger.info("Fail to get response from server");
         this.leader = (this.leader + 1) % masters.size();
@@ -174,16 +177,17 @@ public class MasterClient {
                     .setSeqId(seqId)
                     .build());
 
-        logger.info("Response received from server:\n" + moveResponse);
-        channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
-        ;
+        //        logger.info("Response received from server:\n" + moveResponse);
       } catch (StatusRuntimeException e) {
         logger.info("Fail to get response from server");
         this.leader = (this.leader + 1) % masters.size();
         continue;
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        throw new RuntimeException(e);
+      } finally {
+        try {
+          channel.shutdown().awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
       }
 
       if (moveResponse.getStatus() == 0) {

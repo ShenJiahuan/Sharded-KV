@@ -89,6 +89,13 @@ public class MasterConfig {
     return jsonData.toString();
   }
 
+  public int getCurrentVersion() {
+    mutex.lock();
+    final int version = historyGroupMap.size() - 1;
+    mutex.unlock();
+    return version;
+  }
+
   private void reshardByAdd(Long gidToAdd) {
     if (shardMap.size() == 0) {
       shardMap.put(gidToAdd, LongStream.range(0, SHARD_COUNT).boxed().collect(Collectors.toList()));

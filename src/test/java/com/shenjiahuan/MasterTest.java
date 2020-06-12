@@ -3,12 +3,10 @@ package com.shenjiahuan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import com.google.gson.reflect.TypeToken;
 import com.shenjiahuan.config.MasterConfig;
 import com.shenjiahuan.node.MasterClient;
+import com.shenjiahuan.util.Pair;
+import com.shenjiahuan.util.Utils;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
@@ -20,12 +18,12 @@ public class MasterTest {
   private void check(MasterClient masterClient, Set<Long> groups) {
     final String queryResponse = masterClient.query(-1);
 
-    final Map<Long, List<Server>> groupMap = getGroupMap(queryResponse);
+    final Map<Long, List<Server>> groupMap = Utils.getGroupMap(queryResponse);
 
     assertEquals(groups, groupMap.keySet());
 
     if (groups.size() > 0) {
-      final Map<Long, List<Long>> shardMap = getShardMap(queryResponse);
+      final Map<Long, List<Long>> shardMap = Utils.getShardMap(queryResponse);
 
       final List<Long> shards =
           shardMap
@@ -44,43 +42,12 @@ public class MasterTest {
     }
   }
 
-  private Map<Long, List<Server>> getGroupMap(String queryResponse) {
-    final JsonObject jsonObject = JsonParser.parseString(queryResponse).getAsJsonObject();
-    return new Gson()
-        .fromJson(
-            jsonObject.get("groupMap").toString(),
-            new TypeToken<Map<Long, List<Server>>>() {}.getType());
-  }
-
-  private Map<Long, List<Long>> getShardMap(String queryResponse) {
-    final JsonObject jsonObject = JsonParser.parseString(queryResponse).getAsJsonObject();
-    return new Gson()
-        .fromJson(
-            jsonObject.get("shardMap").toString(),
-            new TypeToken<Map<Long, List<Long>>>() {}.getType());
-  }
-
-  private long getContainingGroup(String queryResponse, long shardId) {
-    return getShardMap(queryResponse)
-        .entrySet()
-        .stream()
-        .filter(e -> e.getValue().contains(shardId))
-        .collect(Collectors.toList())
-        .get(0)
-        .getKey();
-  }
-
-  private int getVersion(String queryResponse) {
-    final JsonObject jsonObject = JsonParser.parseString(queryResponse).getAsJsonObject();
-    return jsonObject.get("version").getAsInt();
-  }
-
   @Test
   public void testBasic() {
-    Config config = new Config(3, Arrays.asList(1234, 1235, 1236));
+    TestMasterConfig config = new TestMasterConfig(3, Arrays.asList(1234, 1235, 1236));
 
     String[] queryResult = new String[6];
-    MasterClient client = config.createClient();
+    MasterClient client = config.createMasterClient();
     final int nParallelClient = 10;
 
     System.out.println("Test: Basic leave/join ...");
@@ -118,7 +85,7 @@ public class MasterTest {
       queryResult[3] = client.query(-1);
 
       final String res1 = client.query(-1);
-      final Map<Long, List<Server>> groupMap1 = getGroupMap(res1);
+      final Map<Long, List<Server>> groupMap1 = Utils.getGroupMap(res1);
 
       List<Server> serverList1 = groupMap1.get(gid1);
       assertEquals(3, serverList1.size());
@@ -154,7 +121,7 @@ public class MasterTest {
       for (int i = 0; i < config.getnMasters(); i++) {
         config.shutDownMaster(i);
         for (String s : queryResult) {
-          final String res = client.query(getVersion(s));
+          final String res = client.query(Utils.getVersion(s));
           assertEquals(s, res);
         }
         config.startMaster(i);
@@ -184,18 +151,18 @@ public class MasterTest {
 
         if (i < MasterConfig.SHARD_COUNT / 2) {
           client.move(i, gid3);
-          if (getContainingGroup(res1, i) != gid3) {
+          if (Utils.getContainingGroup(res1, i) != gid3) {
             final String res2 = client.query(-1);
-            assertTrue(getVersion(res2) > getVersion(res1));
+            assertTrue(Utils.getVersion(res2) > Utils.getVersion(res1));
           }
         } else {
           client.move(i, gid4);
-          if (getContainingGroup(res1, i) != gid4) {
+          if (Utils.getContainingGroup(res1, i) != gid4) {
             final String res2 = client.query(-1);
-            if (getVersion(res2) <= getVersion(res1)) {
+            if (Utils.getVersion(res2) <= Utils.getVersion(res1)) {
               System.out.println(2333);
             }
-            assertTrue(getVersion(res2) > getVersion(res1));
+            assertTrue(Utils.getVersion(res2) > Utils.getVersion(res1));
           }
         }
       }
@@ -203,9 +170,9 @@ public class MasterTest {
       final String res3 = client.query(-1);
       for (int i = 0; i < MasterConfig.SHARD_COUNT; i++) {
         if (i < MasterConfig.SHARD_COUNT / 2) {
-          assertEquals(getContainingGroup(res3, i), gid3);
+          assertEquals(Utils.getContainingGroup(res3, i), gid3);
         } else {
-          assertEquals(getContainingGroup(res3, i), gid4);
+          assertEquals(Utils.getContainingGroup(res3, i), gid4);
         }
       }
       client.leave(gid3);
@@ -218,7 +185,7 @@ public class MasterTest {
       MasterClient[] clients = new MasterClient[nParallelClient];
 
       for (int i = 0; i < nParallelClient; i++) {
-        clients[i] = config.createClient();
+        clients[i] = config.createMasterClient();
       }
 
       Thread[] threads = new Thread[nParallelClient];

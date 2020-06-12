@@ -3,13 +3,13 @@ package com.shenjiahuan.node;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.shenjiahuan.Pair;
 import com.shenjiahuan.Server;
 import com.shenjiahuan.ServerList;
 import com.shenjiahuan.config.MasterConfig;
 import com.shenjiahuan.log.Action;
 import com.shenjiahuan.log.Log;
 import com.shenjiahuan.rpc.MasterGrpcServer;
+import com.shenjiahuan.util.Pair;
 import com.shenjiahuan.zookeeper.ZKConnection;
 import java.io.IOException;
 import java.util.List;
@@ -31,7 +31,7 @@ public class Master extends GenericNode implements Runnable {
     this.masterPort = masterPort;
   }
 
-  public void handleChange(List<Log> newLogs) {
+  public void handleChange(List<Log> newLogs, int index) {
     // TODO: What if same client send concurrent requests?
     for (Log log : newLogs) {
       JsonObject logData = JsonParser.parseString(log.getData()).getAsJsonObject();
@@ -135,17 +135,20 @@ public class Master extends GenericNode implements Runnable {
     return 0;
   }
 
+  // TODO: Do I handle resent quries correctly? They will be logged twice.
   public Pair<Integer, String> query(int version, Long clientId, Long seqId) {
     if (!conn.isLeader()) {
       return new Pair<>(1, "");
     }
 
-    final JsonObject jsonData = new JsonObject();
-    jsonData.addProperty("version", version);
-    jsonData.addProperty("clientId", clientId);
-    jsonData.addProperty("seqId", seqId);
-    final String data = jsonData.toString();
-    conn.append(new Gson().toJsonTree(new Log(Action.QUERY, data)).getAsJsonObject());
+    if (version < 0 || version >= masterConfig.getCurrentVersion()) {
+      final JsonObject jsonData = new JsonObject();
+      jsonData.addProperty("version", version);
+      jsonData.addProperty("clientId", clientId);
+      jsonData.addProperty("seqId", seqId);
+      final String data = jsonData.toString();
+      conn.append(new Gson().toJsonTree(new Log(Action.QUERY, data)).getAsJsonObject());
+    }
     final String config = masterConfig.getConfig(version);
     return new Pair<>(0, config);
   }
@@ -184,7 +187,7 @@ public class Master extends GenericNode implements Runnable {
   public void run() {
     final MasterGrpcServer grpcServer = new MasterGrpcServer(this, masterPort);
     grpcServer.start();
-    conn = new ZKConnection(url, this, "/test");
+    conn = new ZKConnection(url, this, "/test", "/election/master");
     try {
       conn.connect();
       synchronized (this) {

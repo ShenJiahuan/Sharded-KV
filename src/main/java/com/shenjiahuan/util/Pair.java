@@ -1,4 +1,4 @@
-package com.shenjiahuan;
+package com.shenjiahuan.util;
 
 public class Pair<K, V> {
 

@@ -4,7 +4,11 @@ public enum Action {
   JOIN(1),
   LEAVE(2),
   QUERY(3),
-  MOVE(4);
+  MOVE(4),
+  GET(5),
+  PUT(6),
+  UPDATE_CONF(7),
+  PULL(8);
 
   private int code;
 

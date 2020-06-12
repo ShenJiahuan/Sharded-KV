@@ -2,7 +2,10 @@ package com.shenjiahuan.zookeeper;
 
 import static org.apache.zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import com.shenjiahuan.log.Log;
 import com.shenjiahuan.node.GenericNode;
@@ -10,6 +13,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -17,7 +21,7 @@ import org.apache.log4j.Logger;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
 
-public class ZKConnection implements AsyncCallback.StatCallback {
+public class ZKShardConnection implements AsyncCallback.StatCallback {
 
   private final Logger logger = Logger.getLogger(getClass());
 
@@ -28,6 +32,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
   private final String znode;
   private byte[] prevData;
   private final Map<String, Integer> znodeVer = new ConcurrentHashMap<>();
+  private final Map<String, AtomicInteger> znodeIndex = new HashMap<>();
   private AtomicBoolean isLeader = new AtomicBoolean(false);
   private String createdNode;
   private String watchedNode;
@@ -36,12 +41,13 @@ public class ZKConnection implements AsyncCallback.StatCallback {
   private final String leaderElectionRootNode;
   private static final String PROCESS_NODE_PREFIX = "/p_";
 
-  public ZKConnection(
+  public ZKShardConnection(
       String host, GenericNode listener, String znode, String leaderElectionRootNode) {
     this.host = host;
     this.listener = listener;
     this.znode = znode;
     this.leaderElectionRootNode = leaderElectionRootNode;
+    this.znodeIndex.put(znode, new AtomicInteger(0));
   }
 
   public void connect() throws IOException {
@@ -125,7 +131,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         List<Log> logDiff = new ArrayList<>(currentLog.subList(prevLog.size(), currentLog.size()));
 
         if (logDiff.size() > 0) {
-          listener.handleChange(logDiff, 0);
+          listener.handleChange(logDiff, znodeIndex.get(znode).getAndIncrement());
         }
         prevData = b;
       }
@@ -140,7 +146,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
     return dead.get();
   }
 
-  public void append(JsonObject data) {
+  public int start(JsonObject data) {
     while (true) {
       try {
         // logger.info(this.hashCode() + ": acquiring lock");
@@ -152,16 +158,22 @@ public class ZKConnection implements AsyncCallback.StatCallback {
                 : JsonParser.parseString(new String(prevData)).getAsJsonArray();
         array.add(data);
         zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
+        int index = znodeIndex.get(znode).get();
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
         // logger.info(this.hashCode() + ": released lock");
-        return;
+        return index;
       } catch (KeeperException.BadVersionException e) {
         logger.info("version incorrect, will retry later...");
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
         // logger.info(this.hashCode() + ": released lock");
-        Thread.yield();
+        //        Thread.yield();
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException interruptedException) {
+          interruptedException.printStackTrace();
+        }
       } catch (KeeperException | InterruptedException e) {
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();

@@ -2,6 +2,7 @@ package com.shenjiahuan.rpc;
 
 import com.shenjiahuan.*;
 import com.shenjiahuan.node.Master;
+import com.shenjiahuan.util.Pair;
 import io.grpc.stub.StreamObserver;
 import org.apache.log4j.Logger;
 
