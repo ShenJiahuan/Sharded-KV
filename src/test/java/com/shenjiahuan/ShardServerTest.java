@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.shenjiahuan.config.MasterConfig;
 import com.shenjiahuan.node.ShardClient;
 import com.shenjiahuan.util.Utils;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import org.apache.log4j.Logger;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class ShardServerTest {
@@ -36,6 +40,16 @@ public class ShardServerTest {
 
     logger.info("key: " + key + ", expected: " + expectedValue + ", actual:" + actualValue.get());
     return expectedValue.equals(actualValue.get());
+  }
+
+  @BeforeEach
+  private void setUp() throws IOException, InterruptedException {
+    final Process p = Runtime.getRuntime().exec("docker exec zoo1 ./reset.sh");
+    String s;
+    BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    while ((s = br.readLine()) != null) System.out.println(s);
+    p.waitFor();
+    p.destroy();
   }
 
   @Test
@@ -169,11 +183,6 @@ public class ShardServerTest {
     }
 
     config.leaveGroup(0);
-    //    try {
-    //      Thread.sleep(1000000);
-    //    } catch (InterruptedException e) {
-    //      e.printStackTrace();
-    //    }
 
     for (int i = 0; i < n; i++) {
       assertTrue(check(client, keys.get(i), values.get(i)));
@@ -198,6 +207,110 @@ public class ShardServerTest {
       assertTrue(check(client, keys.get(i), values.get(i)));
     }
 
+    System.out.println("  ... Passed");
+  }
+
+  @Test
+  public void testMultipleJoinLeave() {
+    System.out.println("Test: multiple join and leave ...");
+
+    final TestShardServerConfig config =
+        new TestShardServerConfig(
+            3,
+            Arrays.asList(1234, 1235, 1236),
+            3,
+            3,
+            Arrays.asList(
+                Arrays.asList(20001, 20002, 20003),
+                Arrays.asList(30001, 30002, 30003),
+                Arrays.asList(40001, 40002, 40003)));
+
+    final ShardClient client = config.createShardClient();
+    client.init();
+    final int n = 30;
+
+    final List<String> keys = new ArrayList<>();
+    final List<String> values = new ArrayList<>();
+
+    config.joinGroup(0);
+
+    for (int i = 0; i < n; i++) {
+      final String key = String.valueOf(i);
+      byte[] bytes = new byte[20];
+      new Random().nextBytes(bytes);
+      final String value = new String(bytes);
+
+      keys.add(key);
+      values.add(value);
+      client.put(key, value);
+    }
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    config.joinGroup(1);
+    config.joinGroup(2);
+    config.leaveGroup(0);
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+
+      final String key = keys.get(i);
+      byte[] bytes = new byte[20];
+      new Random().nextBytes(bytes);
+      final String value = new String(bytes);
+
+      client.put(key, value);
+      values.set(i, value);
+    }
+
+    config.leaveGroup(1);
+    config.joinGroup(0);
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+
+      final String key = keys.get(i);
+      byte[] bytes = new byte[20];
+      new Random().nextBytes(bytes);
+      final String value = new String(bytes);
+
+      client.put(key, value);
+      values.set(i, value);
+    }
+
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+
+    config.shutDownGroup(0);
+    config.shutDownGroup(1);
+    config.shutDownGroup(2);
+
+    config.startGroup(0);
+    config.startGroup(1);
+    config.startGroup(2);
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    config.shutDownGroup(0);
+    config.shutDownGroup(1);
+    config.shutDownGroup(2);
     System.out.println("  ... Passed");
   }
 }

@@ -71,8 +71,19 @@ public class TestShardServerConfig extends TestMasterConfig {
   }
 
   public void startGroup(int gid) {
-    for (ShardServer shardServer : shardServers.get(gid)) {
+    this.shardServers.set(gid, new ArrayList<>());
+    for (int i = 0; i < serverPerGroup; i++) {
+      final ShardServer shardServer =
+          new ShardServer(
+              "localhost:21811",
+              shardServerPorts.get(gid).get(i),
+              gid,
+              masterPorts
+                  .stream()
+                  .map(port -> new Pair<>("localhost", port))
+                  .collect(Collectors.toList()));
       new Thread(shardServer).start();
+      this.shardServers.get(gid).add(shardServer);
     }
   }
 

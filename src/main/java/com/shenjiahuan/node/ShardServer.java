@@ -38,15 +38,16 @@ public class ShardServer extends GenericNode implements Runnable {
   private int version = -1;
   private Map<Long, List<Server>> groupMap = new HashMap<>();
   private Map<Long, List<Long>> shardMap = new HashMap<>();
-  private Map<Integer, Map<Long, List<Server>>> historyGroupMap = new HashMap<>();
-  private Map<Integer, Map<Long, List<Long>>> historyShardMap = new HashMap<>();
+  private final Map<Integer, Map<Long, List<Server>>> historyGroupMap = new HashMap<>();
+  private final Map<Integer, Map<Long, List<Long>>> historyShardMap = new HashMap<>();
   private Map<String, String> shardData = new HashMap<>();
   private final Map<Long, Integer> waitingShards = new HashMap<>();
   private final Map<Long, Long> executed = new HashMap<>();
   private final Map<Integer, Map<String, String>> migratingShardData = new HashMap<>();
   private final Map<Integer, Map<Long, Long>> migratingExecuted = new HashMap<>();
+  private final Map<Integer, Map<Long, Integer>> migratingWaiting = new HashMap<>();
   private final Lock mutex = new ReentrantLock();
-  private AtomicBoolean stopped = new AtomicBoolean(false);
+  private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final Map<Integer, Chan<ChanMessage<NotifyResponse>>> chanMap = new HashMap<>();
 
   public ShardServer(
@@ -73,7 +74,6 @@ public class ShardServer extends GenericNode implements Runnable {
       // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
       // logger.info(this.hashCode() + ": released lock");
-      logger.info(this.hashCode() + ": writing log to zk");
       int index = conn.start(args);
       // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
@@ -128,11 +128,12 @@ public class ShardServer extends GenericNode implements Runnable {
 
   public void handleChange(List<Log> newLogs, int index) {
     logger.info(this.hashCode() + ": handle change of " + index);
-    for (Log log : newLogs) {
-      try {
-        // logger.info(this.hashCode() + ": acquiring lock");
-        mutex.lock();
-        // logger.info(this.hashCode() + ": acquired lock");
+    try {
+      // logger.info(this.hashCode() + ": acquiring lock");
+      mutex.lock();
+      // logger.info(this.hashCode() + ": acquired lock");
+      for (Log log : newLogs) {
+
         logger.info(this.hashCode() + " log: " + log);
         NotifyResponse response = new NotifyResponse(OK, "");
         JsonObject logData = JsonParser.parseString(log.getData()).getAsJsonObject();
@@ -170,7 +171,7 @@ public class ShardServer extends GenericNode implements Runnable {
               } else if (Utils.getContainingGroup(shardMap, shardId) != gid) {
                 response.setStatusCode(NOT_BELONG_TO);
               } else if (executed.get(clientId) == null || executed.get(clientId) != requestId) {
-                logger.info("Put " + key + " from " + gid);
+                logger.info("Put <" + key + ", " + value + "> from " + gid);
                 shardData.put(key, value);
                 executed.put(clientId, requestId);
               }
@@ -194,10 +195,21 @@ public class ShardServer extends GenericNode implements Runnable {
                   new Gson()
                       .fromJson(
                           logData.get("executed"), new TypeToken<Map<Long, Long>>() {}.getType());
-              if (pulledVersion == version - 1) {
+              if (pulledVersion <= version - 1) {
                 pulledShardData.forEach(
                     (key, value) -> {
-                      waitingShards.remove(key);
+                      if (waitingShards.get(key) != null
+                          && pulledVersion == waitingShards.get(key)) {
+                        waitingShards.remove(key);
+                      }
+                      migratingWaiting.forEach(
+                          (prevVersion, migratingWaitingShards) -> {
+                            if (migratingWaitingShards.get(key) != null
+                                && pulledVersion == migratingWaitingShards.get(key)) {
+                              migratingShardData.get(prevVersion).putAll(value);
+                              migratingWaitingShards.remove(key);
+                            }
+                          });
                       shardData.putAll(value);
                     });
                 executed.putAll(pulledExecuted);
@@ -208,7 +220,10 @@ public class ShardServer extends GenericNode implements Runnable {
             throw new RuntimeException("Unhandled action");
         }
 
-        if (conn.isLeader()) {
+        logger.info(this.hashCode() + " gid: " + gid + ", response: " + response);
+
+        if (conn.isLeader() && newLogs.size() == 1) {
+          // if newLogs.size() != 1, this is a replay, and no one is waiting for the result
           Chan<ChanMessage<NotifyResponse>> chan;
           if (chanMap.containsKey(index)) {
             chan = chanMap.get(index);
@@ -216,14 +231,13 @@ public class ShardServer extends GenericNode implements Runnable {
             chan = Utils.createChan(2000);
             chanMap.put(index, chan);
           }
-          logger.info(this.hashCode() + ": putting to chan of " + index);
           chan.put(new ChanMessage<>(ChanMessageType.SUCCESS, response));
         }
-      } finally {
-        // logger.info(this.hashCode() + ": releasing lock");
-        mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
       }
+    } finally {
+      // logger.info(this.hashCode() + ": releasing lock");
+      mutex.unlock();
+      // logger.info(this.hashCode() + ": released lock");
     }
   }
 
@@ -264,6 +278,15 @@ public class ShardServer extends GenericNode implements Runnable {
                   .stream()
                   .filter(e -> removedShards.contains(Utils.key2Shard(e.getKey())))
                   .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+
+          migratingWaiting.put(
+              prevVersion,
+              waitingShards
+                  .entrySet()
+                  .stream()
+                  .filter(e -> removedShards.contains(e.getKey()))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+
           shardData =
               shardData
                   .entrySet()
@@ -313,10 +336,8 @@ public class ShardServer extends GenericNode implements Runnable {
       if (migrateVersion >= version) {
         return new Pair<>(NOT_BELONG_TO, "");
       }
-      //      if (!migratingShardData.containsKey(migrateVersion)) {
-      //        System.out.println("FUCK!");
-      //      }
-      while (!migratingShardData.containsKey(migrateVersion)) {
+      while (!migratingShardData.containsKey(migrateVersion)
+          || migratingWaiting.get(migrateVersion).size() > 0) {
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
         // logger.info(this.hashCode() + ": released lock");

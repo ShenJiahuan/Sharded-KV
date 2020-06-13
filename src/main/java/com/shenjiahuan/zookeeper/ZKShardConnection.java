@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -32,7 +31,6 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
   private final String znode;
   private byte[] prevData;
   private final Map<String, Integer> znodeVer = new ConcurrentHashMap<>();
-  private final Map<String, AtomicInteger> znodeIndex = new HashMap<>();
   private AtomicBoolean isLeader = new AtomicBoolean(false);
   private String createdNode;
   private String watchedNode;
@@ -47,7 +45,6 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
     this.listener = listener;
     this.znode = znode;
     this.leaderElectionRootNode = leaderElectionRootNode;
-    this.znodeIndex.put(znode, new AtomicInteger(0));
   }
 
   public void connect() throws IOException {
@@ -131,7 +128,7 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
         List<Log> logDiff = new ArrayList<>(currentLog.subList(prevLog.size(), currentLog.size()));
 
         if (logDiff.size() > 0) {
-          listener.handleChange(logDiff, znodeIndex.get(znode).getAndIncrement());
+          listener.handleChange(logDiff, stat.getVersion());
         }
         prevData = b;
       }
@@ -158,7 +155,7 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
                 : JsonParser.parseString(new String(prevData)).getAsJsonArray();
         array.add(data);
         zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
-        int index = znodeIndex.get(znode).get();
+        int index = znodeVer.get(znode) + 1;
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
         // logger.info(this.hashCode() + ": released lock");
