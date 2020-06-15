@@ -520,8 +520,6 @@ public class ShardServerTest {
     Utils.sleep(500);
     config.leaveGroup(0);
 
-    logger.info("FUCK!!!");
-
     config.shutDownGroup(0);
     Utils.sleep(100);
     config.shutDownGroup(1);
@@ -535,8 +533,6 @@ public class ShardServerTest {
     config.startGroup(1);
     config.startGroup(2);
 
-    logger.info("FUCK OVER!!!");
-
     Utils.sleep(100);
     config.joinGroup(0);
     config.leaveGroup(1);
@@ -544,6 +540,107 @@ public class ShardServerTest {
     config.joinGroup(1);
 
     Utils.sleep(1000);
+
+    done.set(true);
+
+    for (Thread t : threads) {
+      try {
+        t.join();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    config.cleanUp();
+
+    System.out.println("  ... Passed");
+  }
+
+  @Test
+  public void testConcurrent2() {
+    System.out.println("Test: more concurrent puts and configuration changes...");
+
+    System.out.println("Test: concurrent puts and configuration changes...");
+
+    final TestShardServerConfig config =
+        new TestShardServerConfig(
+            3,
+            Arrays.asList(1234, 1235, 1236),
+            3,
+            3,
+            Arrays.asList(
+                Arrays.asList(20001, 20002, 20003),
+                Arrays.asList(30001, 30002, 30003),
+                Arrays.asList(40001, 40002, 40003)));
+
+    final ShardClient client = config.createShardClient();
+    client.init();
+    final int n = 10;
+
+    final List<String> keys = new ArrayList<>();
+    final List<String> values = new ArrayList<>();
+
+    config.joinGroup(1);
+    config.joinGroup(0);
+    config.joinGroup(2);
+
+    for (int i = 0; i < n; i++) {
+      final String key = String.valueOf(i);
+      byte[] bytes = new byte[20];
+      new Random().nextBytes(bytes);
+      final String value = new String(bytes);
+
+      keys.add(key);
+      values.add(value);
+      client.put(key, value);
+    }
+
+    final AtomicBoolean done = new AtomicBoolean(false);
+    final List<Thread> threads = new ArrayList<>();
+
+    for (int i = 0; i < n; i++) {
+      final int index = i;
+      final Thread t = new Thread(() -> {
+        final ShardClient client1 = config.createShardClient();
+        while (!done.get()) {
+          assertTrue(check(client, keys.get(index), values.get(index)));
+          final String key = String.valueOf(index);
+          byte[] bytes = new byte[20];
+          new Random().nextBytes(bytes);
+          final String value = new String(bytes);
+
+          values.set(index, value);
+          client1.put(key, value);
+          Utils.sleep(ThreadLocalRandom.current().nextLong(10, 100));
+        }
+      });
+      t.start();
+      threads.add(t);
+    }
+
+    config.leaveGroup(0);
+    config.leaveGroup(2);
+    Utils.sleep(3000);
+    config.joinGroup(0);
+    config.joinGroup(2);
+    config.leaveGroup(1);
+    Utils.sleep(3000);
+    config.joinGroup(1);
+    config.leaveGroup(0);
+    config.leaveGroup(2);
+    Utils.sleep(3000);
+
+    config.shutDownGroup(1);
+    config.shutDownGroup(2);
+    Utils.sleep(1000);
+    config.startGroup(1);
+    config.startGroup(2);
+
+    Utils.sleep(2000);
 
     done.set(true);
 
