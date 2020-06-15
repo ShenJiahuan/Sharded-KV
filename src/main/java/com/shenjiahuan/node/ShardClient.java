@@ -7,10 +7,7 @@ import com.shenjiahuan.util.Utils;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
@@ -29,15 +26,13 @@ public class ShardClient {
   private final Map<Long, Integer> groupLeader = new HashMap<>();
   private boolean initialized = false;
   private final MasterClient masterClient;
-  private final List<List<Integer>> shardServerPorts;
   private final Lock mutex = new ReentrantLock();
   private static final Long RETRY_INTERVAL = 10L;
   private final AtomicBoolean aborted = new AtomicBoolean(false);
 
-  public ShardClient(List<Pair<String, Integer>> masters, List<List<Integer>> shardServerPorts) {
+  public ShardClient(List<Pair<String, Integer>> masters) {
     this.clientId = new Random().nextLong();
     this.requestId = 0;
-    this.shardServerPorts = shardServerPorts;
     this.masterClient = new MasterClient(masters);
   }
 
@@ -234,5 +229,41 @@ public class ShardClient {
 
   public void abort() {
     aborted.set(true);
+  }
+
+  public void interactive() {
+    final Scanner scanner = new Scanner(System.in);
+    while (true) {
+      System.out.print(">>> ");
+      final String line = scanner.nextLine();
+      final String[] parts = line.split(" ");
+      switch (parts[0]) {
+        case "put":
+          {
+            final String key = parts[1];
+            final String value = parts[2];
+            putOrDelete(key, value, false);
+            break;
+          }
+        case "get":
+          {
+            final String key = parts[1];
+            final String value = get(key);
+            System.out.println(value);
+            break;
+          }
+        case "delete":
+          {
+            final String key = parts[1];
+            putOrDelete(key, "", true);
+            break;
+          }
+        default:
+          {
+            System.out.println("Invalid operation");
+            break;
+          }
+      }
+    }
   }
 }

@@ -60,8 +60,7 @@ public class TestShardServerConfig extends TestMasterConfig {
         masterPorts
             .stream()
             .map(port -> new Pair<>("localhost", port))
-            .collect(Collectors.toList()),
-        shardServerPorts);
+            .collect(Collectors.toList()));
   }
 
   public void shutDownGroup(int gid) {

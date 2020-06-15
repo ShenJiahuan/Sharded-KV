@@ -176,13 +176,6 @@ public class Master extends GenericNode implements Runnable {
     }
   }
 
-  public static void main(String[] args) {
-    assert args.length == 2;
-    final String url = args[0];
-    final int masterPort = Integer.parseInt(args[1]);
-    new Master(url, masterPort).run();
-  }
-
   @Override
   public void run() {
     final MasterGrpcServer grpcServer = new MasterGrpcServer(this, masterPort);
