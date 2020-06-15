@@ -26,7 +26,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.KeeperException;
 
 public class ShardServer extends GenericNode implements Runnable {
 
@@ -149,19 +148,24 @@ public class ShardServer extends GenericNode implements Runnable {
               } else if (Utils.getContainingGroup(shardMap, shardId) != gid) {
                 response.setStatusCode(NOT_BELONG_TO);
               } else if (waitingShards.size() > 0) {
-                  response.setStatusCode(NOT_BELONG_TO);
+                response.setStatusCode(NOT_BELONG_TO);
               } else {
                 logger.info("Get " + key + " from " + gid);
-                assert shardData.containsKey(key);
-                response.setData(shardData.get(key));
+                if (shardData.containsKey(key)) {
+                  response.setData(shardData.get(key));
+                } else {
+                  response.setStatusCode(NOT_FOUND);
+                  response.setData("");
+                }
               }
               break;
             }
-          case PUT:
+          case PUT_OR_DELETE:
             {
               final int clientVersion = logData.get("clientVersion").getAsInt();
               final String key = logData.get("key").getAsString();
               final String value = logData.get("value").getAsString();
+              final boolean delete = logData.get("delete").getAsBoolean();
               final long clientId = logData.get("clientId").getAsLong();
               final long requestId = logData.get("requestId").getAsLong();
               final long shardId = Utils.key2Shard(key);
@@ -172,8 +176,13 @@ public class ShardServer extends GenericNode implements Runnable {
               } else if (waitingShards.size() > 0) {
                 response.setStatusCode(NOT_BELONG_TO);
               } else if (executed.get(clientId) == null || executed.get(clientId) != requestId) {
-                logger.info("Put <" + key + ", " + value + "> from " + gid);
-                shardData.put(key, value);
+                if (!delete) {
+                  logger.info("Put <" + key + ", " + value + "> from " + gid);
+                  shardData.put(key, value);
+                } else {
+                  logger.info("Delete " + key + " from " + gid);
+                  shardData.remove(key);
+                }
                 executed.put(clientId, requestId);
               }
               break;
@@ -314,18 +323,21 @@ public class ShardServer extends GenericNode implements Runnable {
     return new Pair<>(response.getStatusCode(), response.getData());
   }
 
-  public StatusCode put(
-      int clientVersion, String key, String value, long clientId, long requestId) {
+  public StatusCode putOrDelete(
+      int clientVersion, String key, String value, boolean delete, long clientId, long requestId) {
     JsonObject data = new JsonObject();
     data.addProperty("clientVersion", clientVersion);
     data.addProperty("key", key);
     data.addProperty("value", value);
+    data.addProperty("delete", delete);
     data.addProperty("clientId", clientId);
     data.addProperty("requestId", requestId);
     NotifyResponse response =
         start(
             clientVersion,
-            new Gson().toJsonTree(new Log(Action.PUT, data.toString())).getAsJsonObject());
+            new Gson()
+                .toJsonTree(new Log(Action.PUT_OR_DELETE, data.toString()))
+                .getAsJsonObject());
     return response.getStatusCode();
   }
 
@@ -515,6 +527,10 @@ public class ShardServer extends GenericNode implements Runnable {
     synchronized (this) {
       notifyAll();
     }
+  }
+
+  public boolean isClosed() {
+    return stopped.get();
   }
 
   @Override

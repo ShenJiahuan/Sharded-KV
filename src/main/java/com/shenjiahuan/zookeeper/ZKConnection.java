@@ -48,7 +48,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
     zoo =
         new ZooKeeper(
             host,
-            1000,
+            15000,
             event -> {
               String path = event.getPath();
               if (event.getType() == Watcher.Event.EventType.None) {
@@ -153,7 +153,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         array.add(data);
         try {
           zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
-        }  catch (KeeperException.SessionExpiredException e) {
+        } catch (KeeperException.SessionExpiredException e) {
           logger.warn("Session expired, failed to put into " + znode);
         } catch (KeeperException.ConnectionLossException e) {
           logger.warn("Connection lost, failed to put into " + znode);

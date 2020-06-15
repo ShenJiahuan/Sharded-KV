@@ -41,26 +41,27 @@ public class ShardClient {
     this.masterClient = new MasterClient(masters);
   }
 
-  private StatusCode doPut(String key, String value, Server server) {
+  private StatusCode doPutOrDelete(String key, String value, boolean delete, Server server) {
     final String host = server.getHost();
     final int port = server.getPort();
     ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
 
     ShardServiceGrpc.ShardServiceBlockingStub stub = ShardServiceGrpc.newBlockingStub(channel);
 
-    PutResponse putResponse;
+    PutOrDeleteResponse putOrDeleteResponse;
     try {
-      putResponse =
+      putOrDeleteResponse =
           stub.put(
-              PutRequest.newBuilder()
+              PutOrDeleteRequest.newBuilder()
                   .setClientVersion(version)
                   .setKey(key)
                   .setValue(value)
+                  .setDelete(delete)
                   .setClientId(clientId)
                   .setRequestId(requestId)
                   .build());
 
-      //      logger.info("Response received from server:\n" + putResponse);
+      //      logger.info("Response received from server:\n" + putOrDeleteResponse);
     } catch (StatusRuntimeException e) {
       logger.info("Fail to get response from server");
       return StatusCode.CONNECTION_LOST;
@@ -72,7 +73,7 @@ public class ShardClient {
       }
     }
 
-    return StatusCode.convert(putResponse.getStatus());
+    return StatusCode.convert(putOrDeleteResponse.getStatus());
   }
 
   public Pair<StatusCode, String> doGet(String key, Server server) {
@@ -133,7 +134,7 @@ public class ShardClient {
     }
   }
 
-  public void put(String key, String value) {
+  public void putOrDelete(String key, String value, boolean delete) {
     aborted.set(false);
     while (!aborted.get()) {
       // logger.info(this.hashCode() + ": acquiring lock");
@@ -148,7 +149,7 @@ public class ShardClient {
         final List<Server> servers = groupMap.get(gid);
         int leader = groupLeader.get(gid);
         final Server server = servers.get(leader);
-        final StatusCode statusCode = doPut(key, value, server);
+        final StatusCode statusCode = doPutOrDelete(key, value, delete, server);
         logger.info(statusCode);
         if (statusCode == StatusCode.OK) {
           requestId++;
@@ -197,6 +198,8 @@ public class ShardClient {
         final StatusCode statusCode = result.getKey();
         if (statusCode == StatusCode.OK) {
           return result.getValue();
+        } else if (statusCode == StatusCode.NOT_FOUND) {
+          return null;
         } else if (statusCode == StatusCode.NOT_BELONG_TO) {
           try {
             Thread.sleep(RETRY_INTERVAL);

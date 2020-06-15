@@ -4,7 +4,8 @@ public enum StatusCode {
   OK(0),
   NOT_LEADER(1),
   NOT_BELONG_TO(2),
-  CONNECTION_LOST(3);
+  CONNECTION_LOST(3),
+  NOT_FOUND(4);
 
   private int code;
 

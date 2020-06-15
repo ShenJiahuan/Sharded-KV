@@ -22,16 +22,20 @@ public class ShardServiceImpl extends ShardServiceGrpc.ShardServiceImplBase {
   }
 
   @Override
-  public void put(PutRequest request, StreamObserver<PutResponse> responseObserver) {
+  public void put(
+      PutOrDeleteRequest request, StreamObserver<PutOrDeleteResponse> responseObserver) {
     final int clientVersion = request.getClientVersion();
     final String key = request.getKey();
     final String value = request.getValue();
+    final boolean delete = request.getDelete();
     final long clientId = request.getClientId();
     final long requestId = request.getRequestId();
 
-    final StatusCode statusCode = shardServer.put(clientVersion, key, value, clientId, requestId);
+    final StatusCode statusCode =
+        shardServer.putOrDelete(clientVersion, key, value, delete, clientId, requestId);
 
-    PutResponse response = PutResponse.newBuilder().setStatus(statusCode.getCode()).build();
+    PutOrDeleteResponse response =
+        PutOrDeleteResponse.newBuilder().setStatus(statusCode.getCode()).build();
 
     responseObserver.onNext(response);
     responseObserver.onCompleted();

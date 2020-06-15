@@ -6,7 +6,7 @@ public enum Action {
   QUERY(3),
   MOVE(4),
   GET(5),
-  PUT(6),
+  PUT_OR_DELETE(6),
   UPDATE_CONF(7),
   PULL(8);
 

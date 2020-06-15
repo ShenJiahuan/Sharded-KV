@@ -2,15 +2,16 @@ syntax = "proto3";
 option java_multiple_files = true;
 package com.shenjiahuan;
 
-message PutRequest {
+message PutOrDeleteRequest {
   int32 clientVersion = 1;
   string key = 2;
   string value = 3;
-  int64 clientId = 4;
-  int64 requestId = 5;
+  bool delete = 4;
+  int64 clientId = 5;
+  int64 requestId = 6;
 }
 
-message PutResponse {
+message PutOrDeleteResponse {
   int32 status = 1;
 }
 
@@ -36,7 +37,7 @@ message PullResponse {
 }
 
 service ShardService {
-  rpc put(PutRequest) returns (PutResponse);
+  rpc put(PutOrDeleteRequest) returns (PutOrDeleteResponse);
   rpc get(GetRequest) returns (GetResponse);
   rpc pull(PullRequest) returns (PullResponse);
 }

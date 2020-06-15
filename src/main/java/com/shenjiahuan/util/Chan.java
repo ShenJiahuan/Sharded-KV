@@ -41,8 +41,4 @@ public class Chan<T extends ChanMessage> {
     lists.add(message);
     notifyAll();
   }
-
-  public synchronized boolean isFull() {
-    return lists.size() >= size;
-  }
 }

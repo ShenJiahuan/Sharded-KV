@@ -16,8 +16,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-
-import com.shenjiahuan.util.Utils;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
@@ -53,7 +51,7 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
     zoo =
         new ZooKeeper(
             host,
-            1000,
+            15000,
             event -> {
               String path = event.getPath();
               if (event.getType() == Watcher.Event.EventType.None) {

@@ -66,7 +66,9 @@ public class TestShardServerConfig extends TestMasterConfig {
 
   public void shutDownGroup(int gid) {
     for (ShardServer shardServer : shardServers.get(gid)) {
-      shardServer.close();
+      if (!shardServer.isClosed()) {
+        shardServer.close();
+      }
     }
   }
 

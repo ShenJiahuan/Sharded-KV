@@ -9,10 +9,7 @@ import com.shenjiahuan.util.Utils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +48,7 @@ public class ShardServerTest {
     }
 
     logger.info("key: " + key + ", expected: " + expectedValue + ", actual:" + actualValue.get());
-    return expectedValue.equals(actualValue.get());
+    return Objects.equals(expectedValue, actualValue.get());
   }
 
   @BeforeEach
@@ -62,6 +59,76 @@ public class ShardServerTest {
     while ((s = br.readLine()) != null) System.out.println(s);
     p.waitFor();
     p.destroy();
+  }
+
+  @Test
+  public void testGetPutDelete() {
+    System.out.println("Test: get, put, delete ...");
+
+    final TestShardServerConfig config =
+        new TestShardServerConfig(
+            3,
+            Arrays.asList(1234, 1235, 1236),
+            3,
+            3,
+            Arrays.asList(
+                Arrays.asList(20001, 20002, 20003),
+                Arrays.asList(30001, 30002, 30003),
+                Arrays.asList(40001, 40002, 40003)));
+
+    final ShardClient client = config.createShardClient();
+    client.init();
+    final int n = 10;
+
+    config.joinGroup(0);
+    config.joinGroup(1);
+
+    final List<String> keys = new ArrayList<>();
+    final List<String> values = new ArrayList<>();
+
+    for (int i = 0; i < n; i++) {
+      final String key = String.valueOf(i);
+      byte[] bytes = new byte[20];
+      new Random().nextBytes(bytes);
+      final String value = new String(bytes);
+
+      keys.add(key);
+      values.add(value);
+      client.putOrDelete(key, value, false);
+    }
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    for (int i = 0; i < n; i++) {
+      final String key = String.valueOf(i);
+
+      values.set(i, null);
+      client.putOrDelete(key, "", true);
+    }
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    for (int i = 0; i < n; i++) {
+      final String key = keys.get(i);
+      byte[] bytes = new byte[20];
+      new Random().nextBytes(bytes);
+      final String value = new String(bytes);
+
+      values.set(i, value);
+      client.putOrDelete(key, value, false);
+    }
+
+    for (int i = 0; i < n; i++) {
+      assertTrue(check(client, keys.get(i), values.get(i)));
+    }
+
+    config.cleanUp();
+
+    System.out.println("  ... Passed");
   }
 
   @Test
@@ -97,7 +164,7 @@ public class ShardServerTest {
 
       keys.add(key);
       values.add(value);
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
     }
 
     for (int i = 0; i < n; i++) {
@@ -138,6 +205,8 @@ public class ShardServerTest {
       assertTrue(check(client, keys.get(i), values.get(i)));
     }
 
+    config.cleanUp();
+
     System.out.println("  ... Passed");
   }
 
@@ -173,7 +242,7 @@ public class ShardServerTest {
 
       keys.add(key);
       values.add(value);
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
     }
 
     for (int i = 0; i < n; i++) {
@@ -190,7 +259,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -204,7 +273,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -218,6 +287,8 @@ public class ShardServerTest {
     for (int i = 0; i < n; i++) {
       assertTrue(check(client, keys.get(i), values.get(i)));
     }
+
+    config.cleanUp();
 
     System.out.println("  ... Passed");
   }
@@ -254,7 +325,7 @@ public class ShardServerTest {
 
       keys.add(key);
       values.add(value);
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
     }
 
     for (int i = 0; i < n; i++) {
@@ -273,7 +344,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -288,7 +359,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -320,9 +391,8 @@ public class ShardServerTest {
       assertTrue(check(client, keys.get(i), values.get(i)));
     }
 
-    config.shutDownGroup(0);
-    config.shutDownGroup(1);
-    config.shutDownGroup(2);
+    config.cleanUp();
+
     System.out.println("  ... Passed");
   }
 
@@ -358,7 +428,7 @@ public class ShardServerTest {
 
       keys.add(key);
       values.add(value);
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
     }
 
     for (int i = 0; i < n; i++) {
@@ -383,7 +453,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -397,7 +467,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -413,7 +483,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -438,7 +508,7 @@ public class ShardServerTest {
       new Random().nextBytes(bytes);
       final String value = new String(bytes);
 
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
       values.set(i, value);
     }
 
@@ -487,7 +557,7 @@ public class ShardServerTest {
 
       keys.add(key);
       values.add(value);
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
     }
 
     final AtomicBoolean done = new AtomicBoolean(false);
@@ -495,20 +565,22 @@ public class ShardServerTest {
 
     for (int i = 0; i < n; i++) {
       final int index = i;
-      final Thread t = new Thread(() -> {
-        final ShardClient client1 = config.createShardClient();
-        while (!done.get()) {
-          assertTrue(check(client, keys.get(index), values.get(index)));
-          final String key = String.valueOf(index);
-          byte[] bytes = new byte[20];
-          new Random().nextBytes(bytes);
-          final String value = new String(bytes);
+      final Thread t =
+          new Thread(
+              () -> {
+                final ShardClient client1 = config.createShardClient();
+                while (!done.get()) {
+                  assertTrue(check(client, keys.get(index), values.get(index)));
+                  final String key = String.valueOf(index);
+                  byte[] bytes = new byte[20];
+                  new Random().nextBytes(bytes);
+                  final String value = new String(bytes);
 
-          values.set(index, value);
-          client1.put(key, value);
-          Utils.sleep(ThreadLocalRandom.current().nextLong(10, 100));
-        }
-      });
+                  values.set(index, value);
+                  client1.putOrDelete(key, value, false);
+                  Utils.sleep(ThreadLocalRandom.current().nextLong(10, 100));
+                }
+              });
       t.start();
       threads.add(t);
     }
@@ -596,7 +668,7 @@ public class ShardServerTest {
 
       keys.add(key);
       values.add(value);
-      client.put(key, value);
+      client.putOrDelete(key, value, false);
     }
 
     final AtomicBoolean done = new AtomicBoolean(false);
@@ -604,20 +676,22 @@ public class ShardServerTest {
 
     for (int i = 0; i < n; i++) {
       final int index = i;
-      final Thread t = new Thread(() -> {
-        final ShardClient client1 = config.createShardClient();
-        while (!done.get()) {
-          assertTrue(check(client, keys.get(index), values.get(index)));
-          final String key = String.valueOf(index);
-          byte[] bytes = new byte[20];
-          new Random().nextBytes(bytes);
-          final String value = new String(bytes);
+      final Thread t =
+          new Thread(
+              () -> {
+                final ShardClient client1 = config.createShardClient();
+                while (!done.get()) {
+                  assertTrue(check(client, keys.get(index), values.get(index)));
+                  final String key = String.valueOf(index);
+                  byte[] bytes = new byte[20];
+                  new Random().nextBytes(bytes);
+                  final String value = new String(bytes);
 
-          values.set(index, value);
-          client1.put(key, value);
-          Utils.sleep(ThreadLocalRandom.current().nextLong(10, 100));
-        }
-      });
+                  values.set(index, value);
+                  client1.putOrDelete(key, value, false);
+                  Utils.sleep(ThreadLocalRandom.current().nextLong(10, 100));
+                }
+              });
       t.start();
       threads.add(t);
     }
