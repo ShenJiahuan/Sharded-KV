@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 public class TestMasterConfig {
 
-  private final int nMasters;
+  protected final int nMasters;
   protected final List<Master> masters;
   protected final List<Integer> masterPorts;
 

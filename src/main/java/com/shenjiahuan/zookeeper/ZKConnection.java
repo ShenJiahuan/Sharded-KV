@@ -151,7 +151,13 @@ public class ZKConnection implements AsyncCallback.StatCallback {
                 ? new JsonArray()
                 : JsonParser.parseString(new String(prevData)).getAsJsonArray();
         array.add(data);
-        zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
+        try {
+          zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
+        }  catch (KeeperException.SessionExpiredException e) {
+          logger.warn("Session expired, failed to put into " + znode);
+        } catch (KeeperException.ConnectionLossException e) {
+          logger.warn("Connection lost, failed to put into " + znode);
+        }
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
         // logger.info(this.hashCode() + ": released lock");

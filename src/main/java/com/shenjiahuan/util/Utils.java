@@ -80,4 +80,12 @@ public class Utils {
         .start();
     return notifyChan;
   }
+
+  public static void sleep(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
 }

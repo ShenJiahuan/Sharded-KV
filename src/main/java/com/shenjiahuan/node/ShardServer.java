@@ -26,6 +26,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.apache.zookeeper.KeeperException;
 
 public class ShardServer extends GenericNode implements Runnable {
 
@@ -147,14 +148,12 @@ public class ShardServer extends GenericNode implements Runnable {
                 response.setStatusCode(NOT_BELONG_TO);
               } else if (Utils.getContainingGroup(shardMap, shardId) != gid) {
                 response.setStatusCode(NOT_BELONG_TO);
-              } else {
-                if (waitingShards.size() > 0) {
+              } else if (waitingShards.size() > 0) {
                   response.setStatusCode(NOT_BELONG_TO);
-                } else {
-                  logger.info("Get " + key + " from " + gid);
-                  assert shardData.containsKey(key);
-                  response.setData(shardData.get(key));
-                }
+              } else {
+                logger.info("Get " + key + " from " + gid);
+                assert shardData.containsKey(key);
+                response.setData(shardData.get(key));
               }
               break;
             }
@@ -169,6 +168,8 @@ public class ShardServer extends GenericNode implements Runnable {
               if (clientVersion != version) {
                 response.setStatusCode(NOT_BELONG_TO);
               } else if (Utils.getContainingGroup(shardMap, shardId) != gid) {
+                response.setStatusCode(NOT_BELONG_TO);
+              } else if (waitingShards.size() > 0) {
                 response.setStatusCode(NOT_BELONG_TO);
               } else if (executed.get(clientId) == null || executed.get(clientId) != requestId) {
                 logger.info("Put <" + key + ", " + value + "> from " + gid);
@@ -383,10 +384,10 @@ public class ShardServer extends GenericNode implements Runnable {
   }
 
   private void updateConfig() {
+    // logger.info(this.hashCode() + ": acquiring lock");
+    mutex.lock();
+    // logger.info(this.hashCode() + ": acquired lock");
     while (!stopped.get()) {
-      // logger.info(this.hashCode() + ": acquiring lock");
-      mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       if (conn.isLeader()) {
         final int nextVersion = version + 1;
         // logger.info(this.hashCode() + ": releasing lock");
@@ -411,6 +412,7 @@ public class ShardServer extends GenericNode implements Runnable {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
+      mutex.lock();
     }
   }
 
@@ -465,10 +467,10 @@ public class ShardServer extends GenericNode implements Runnable {
   }
 
   private void pull() {
+    // logger.info(this.hashCode() + ": acquiring lock");
+    mutex.lock();
+    // logger.info(this.hashCode() + ": acquired lock");
     while (!stopped.get()) {
-      // logger.info(this.hashCode() + ": acquiring lock");
-      mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       if (conn.isLeader() && waitingShards.size() > 0) {
         final Map<Integer, List<Long>> shardsToPull =
             waitingShards.keySet().stream().collect(Collectors.groupingBy(waitingShards::get));
@@ -501,12 +503,15 @@ public class ShardServer extends GenericNode implements Runnable {
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
+      mutex.lock();
     }
   }
 
   @Override
   public void close() {
+    mutex.lock();
     conn.close();
+    mutex.unlock();
     synchronized (this) {
       notifyAll();
     }

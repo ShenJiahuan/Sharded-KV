@@ -70,6 +70,10 @@ public class TestShardServerConfig extends TestMasterConfig {
     }
   }
 
+  public void shutDownServer(int gid, int i) {
+    shardServers.get(gid).get(i).close();
+  }
+
   public void startGroup(int gid) {
     this.shardServers.set(gid, new ArrayList<>());
     for (int i = 0; i < serverPerGroup; i++) {
@@ -87,6 +91,20 @@ public class TestShardServerConfig extends TestMasterConfig {
     }
   }
 
+  public void startServer(int gid, int i) {
+    final ShardServer shardServer =
+        new ShardServer(
+            "localhost:21811",
+            shardServerPorts.get(gid).get(i),
+            gid,
+            masterPorts
+                .stream()
+                .map(port -> new Pair<>("localhost", port))
+                .collect(Collectors.toList()));
+    new Thread(shardServer).start();
+    this.shardServers.get(gid).set(i, shardServer);
+  }
+
   public void joinGroup(int gid) {
     masterClient.join(
         gid,
@@ -99,5 +117,15 @@ public class TestShardServerConfig extends TestMasterConfig {
 
   public void leaveGroup(int gid) {
     masterClient.leave(gid);
+  }
+
+  public void cleanUp() {
+    for (int i = 0; i < nGroups; i++) {
+      shutDownGroup(i);
+    }
+
+    for (int i = 0; i < nMasters; i++) {
+      shutDownMaster(i);
+    }
   }
 }

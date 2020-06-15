@@ -112,10 +112,12 @@ public class ShardClient {
 
   public void updateConfig(int version) {
     final String masterConfig = masterClient.query(version);
-    this.groupMap = Utils.getGroupMap(masterConfig);
-    this.shardMap = Utils.getShardMap(masterConfig);
-    this.groupMap.keySet().forEach(gid -> groupLeader.put(gid, 0));
-    this.version = Utils.getVersion(masterConfig);
+    if (version == -1 || Utils.getVersion(masterConfig) == version) {
+      this.groupMap = Utils.getGroupMap(masterConfig);
+      this.shardMap = Utils.getShardMap(masterConfig);
+      this.groupMap.keySet().forEach(gid -> groupLeader.put(gid, 0));
+      this.version = Utils.getVersion(masterConfig);
+    }
   }
 
   public void waitUntilShardExist(long shardId) {
@@ -159,6 +161,11 @@ public class ShardClient {
             e.printStackTrace();
           }
           updateConfig(version + 1);
+          final boolean groupChanged = Utils.getContainingGroup(shardMap, shardId) != gid;
+          if (!groupChanged) {
+            leader = (leader + 1) % servers.size();
+            groupLeader.put(gid, leader);
+          }
         } else {
           leader = (leader + 1) % servers.size();
           groupLeader.put(gid, leader);
@@ -190,14 +197,25 @@ public class ShardClient {
         final StatusCode statusCode = result.getKey();
         if (statusCode == StatusCode.OK) {
           return result.getValue();
-        } else if (statusCode == StatusCode.NOT_BELONG_TO
-            || statusCode == StatusCode.CONNECTION_LOST) {
+        } else if (statusCode == StatusCode.NOT_BELONG_TO) {
           try {
             Thread.sleep(RETRY_INTERVAL);
           } catch (InterruptedException e) {
             e.printStackTrace();
           }
           updateConfig(version + 1);
+        } else if (statusCode == StatusCode.CONNECTION_LOST) {
+          try {
+            Thread.sleep(RETRY_INTERVAL);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          updateConfig(version + 1);
+          final boolean groupChanged = Utils.getContainingGroup(shardMap, shardId) != gid;
+          if (!groupChanged) {
+            leader = (leader + 1) % servers.size();
+            groupLeader.put(gid, leader);
+          }
         } else {
           leader = (leader + 1) % servers.size();
           groupLeader.put(gid, leader);

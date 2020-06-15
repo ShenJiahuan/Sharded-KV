@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+
+import com.shenjiahuan.util.Utils;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
@@ -154,7 +156,13 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
                 ? new JsonArray()
                 : JsonParser.parseString(new String(prevData)).getAsJsonArray();
         array.add(data);
-        zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
+        try {
+          zoo.setData(znode, array.toString().getBytes(), znodeVer.get(znode));
+        } catch (KeeperException.SessionExpiredException e) {
+          logger.warn("Session expired, failed to put into " + znode);
+        } catch (KeeperException.ConnectionLossException e) {
+          logger.warn("Connection lost, failed to put into " + znode);
+        }
         int index = znodeVer.get(znode) + 1;
         // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
