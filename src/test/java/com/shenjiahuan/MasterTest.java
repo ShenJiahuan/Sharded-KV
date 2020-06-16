@@ -7,10 +7,16 @@ import com.shenjiahuan.config.MasterConfig;
 import com.shenjiahuan.node.MasterClient;
 import com.shenjiahuan.util.Pair;
 import com.shenjiahuan.util.Utils;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class MasterTest {
@@ -40,6 +46,16 @@ public class MasterTest {
 
       assertEquals(expectedShards, shards);
     }
+  }
+
+  @BeforeEach
+  private void setUp() throws IOException, InterruptedException {
+    final Process p = Runtime.getRuntime().exec("docker exec zoo1 ./reset.sh");
+    String s;
+    BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
+    while ((s = br.readLine()) != null) System.out.println(s);
+    p.waitFor();
+    p.destroy();
   }
 
   @Test
@@ -221,6 +237,9 @@ public class MasterTest {
       }
       check(client, gids);
     }
+
+    config.cleanUp();
+
     System.out.println("  ... Passed");
   }
 }

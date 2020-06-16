@@ -120,13 +120,12 @@ public class TestShardServerConfig extends TestMasterConfig {
     masterClient.leave(gid);
   }
 
+  @Override
   public void cleanUp() {
     for (int i = 0; i < nGroups; i++) {
       shutDownGroup(i);
     }
 
-    for (int i = 0; i < nMasters; i++) {
-      shutDownMaster(i);
-    }
+    super.cleanUp();
   }
 }

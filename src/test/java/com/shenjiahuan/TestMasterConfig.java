@@ -9,8 +9,8 @@ import java.util.stream.Collectors;
 
 public class TestMasterConfig {
 
-  protected final int nMasters;
-  protected final List<Master> masters;
+  private final int nMasters;
+  private final List<Master> masters;
   protected final List<Integer> masterPorts;
 
   public TestMasterConfig(int nMasters, List<Integer> masterPorts) {
@@ -44,5 +44,11 @@ public class TestMasterConfig {
 
   public int getnMasters() {
     return nMasters;
+  }
+
+  public void cleanUp() {
+    for (int i = 0; i < nMasters; i++) {
+      shutDownMaster(i);
+    }
   }
 }
