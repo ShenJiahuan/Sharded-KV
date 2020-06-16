@@ -8,6 +8,8 @@ import com.shenjiahuan.Server;
 import com.shenjiahuan.config.MasterConfig;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 
@@ -66,16 +68,12 @@ public class Utils {
     return m.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  public static Chan<ChanMessage<NotifyResponse>> createChan(int timeout) {
-    Chan<ChanMessage<NotifyResponse>> notifyChan = new Chan<>(1);
+  public static BlockingQueue<ChanMessage<NotifyResponse>> createChan(int timeout) {
+    BlockingQueue<ChanMessage<NotifyResponse>> notifyChan = new ArrayBlockingQueue<>(1);
     new Thread(
             () -> {
-              try {
-                Thread.sleep(timeout);
-              } catch (InterruptedException e) {
-                e.printStackTrace();
-              }
-              notifyChan.put(new ChanMessage<>(ChanMessageType.TIMEOUT, null));
+              Utils.sleep(timeout);
+              notifyChan.offer(new ChanMessage<>(ChanMessageType.TIMEOUT, null));
             })
         .start();
     return notifyChan;

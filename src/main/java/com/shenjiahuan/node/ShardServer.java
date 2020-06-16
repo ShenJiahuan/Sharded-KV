@@ -20,6 +20,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
@@ -48,7 +49,7 @@ public class ShardServer extends GenericNode implements Runnable {
   private final Map<Integer, Map<Long, Integer>> migratingWaiting = new HashMap<>();
   private final Lock mutex = new ReentrantLock();
   private final AtomicBoolean stopped = new AtomicBoolean(false);
-  private final Map<Integer, Chan<ChanMessage<NotifyResponse>>> chanMap = new HashMap<>();
+  private final Map<Integer, BlockingQueue<ChanMessage<NotifyResponse>>> chanMap = new HashMap<>();
 
   public ShardServer(
       String url, int shardServerPort, long gid, List<Pair<String, Integer>> masters) {
@@ -78,7 +79,7 @@ public class ShardServer extends GenericNode implements Runnable {
       // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
       // logger.info(this.hashCode() + ": acquired lock");
-      Chan<ChanMessage<NotifyResponse>> notifyChan;
+      BlockingQueue<ChanMessage<NotifyResponse>> notifyChan;
       if (!chanMap.containsKey(index)) {
         notifyChan = Utils.createChan(2000);
         chanMap.put(index, notifyChan);
@@ -89,7 +90,12 @@ public class ShardServer extends GenericNode implements Runnable {
       mutex.unlock();
       // logger.info(this.hashCode() + ": released lock");
 
-      ChanMessage<NotifyResponse> message = notifyChan.take();
+      ChanMessage<NotifyResponse> message;
+      try {
+        message = notifyChan.take();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
       switch (message.getType()) {
         case SUCCESS:
           {
@@ -234,14 +240,14 @@ public class ShardServer extends GenericNode implements Runnable {
 
         if (conn.isLeader() && newLogs.size() == 1) {
           // if newLogs.size() != 1, this is a replay, and no one is waiting for the result
-          Chan<ChanMessage<NotifyResponse>> chan;
+          BlockingQueue<ChanMessage<NotifyResponse>> chan;
           if (chanMap.containsKey(index)) {
             chan = chanMap.get(index);
           } else {
             chan = Utils.createChan(2000);
             chanMap.put(index, chan);
           }
-          chan.put(new ChanMessage<>(ChanMessageType.SUCCESS, response));
+          chan.offer(new ChanMessage<>(ChanMessageType.SUCCESS, response));
         }
       }
     } finally {
