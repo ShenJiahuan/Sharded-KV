@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+
+import com.shenjiahuan.util.Utils;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.Stat;
@@ -110,9 +112,7 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
         return;
       }
 
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       znodeVer.put(znode, stat.getVersion());
       if ((b == null && b != prevData) || (b != null && !Arrays.equals(prevData, b))) {
 
@@ -132,10 +132,7 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
         }
         prevData = b;
       }
-      //      logger.info("prevData length: " + (prevData == null ? 0 : prevData.length));
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
     }
   }
 
@@ -146,9 +143,7 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
   public int start(JsonObject data) {
     while (true) {
       try {
-        // logger.info(this.hashCode() + ": acquiring lock");
         mutex.lock();
-        // logger.info(this.hashCode() + ": acquired lock");
         JsonArray array =
             prevData == null || prevData.length == 0
                 ? new JsonArray()
@@ -162,25 +157,14 @@ public class ZKShardConnection implements AsyncCallback.StatCallback {
           logger.warn("Connection lost, failed to put into " + znode);
         }
         int index = znodeVer.get(znode) + 1;
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         return index;
       } catch (KeeperException.BadVersionException e) {
         logger.info("version incorrect, will retry later...");
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
-        //        Thread.yield();
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException interruptedException) {
-          interruptedException.printStackTrace();
-        }
+        Utils.sleep(100);
       } catch (KeeperException | InterruptedException e) {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         e.printStackTrace();
       }
     }

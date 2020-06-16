@@ -132,9 +132,7 @@ public class ShardClient {
   public void putOrDelete(String key, String value, boolean delete) {
     aborted.set(false);
     while (!aborted.get()) {
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       try {
         final long shardId = Utils.key2Shard(key);
         waitUntilShardExist(shardId);
@@ -167,9 +165,7 @@ public class ShardClient {
           groupLeader.put(gid, leader);
         }
       } finally {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
       }
     }
   }
@@ -177,9 +173,7 @@ public class ShardClient {
   public String get(String key) {
     aborted.set(false);
     while (!aborted.get()) {
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       try {
         final long shardId = Utils.key2Shard(key);
         waitUntilShardExist(shardId);
@@ -219,9 +213,7 @@ public class ShardClient {
           groupLeader.put(gid, leader);
         }
       } finally {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
       }
     }
     return "";

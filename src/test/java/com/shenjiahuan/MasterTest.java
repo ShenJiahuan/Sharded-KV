@@ -7,7 +7,6 @@ import com.shenjiahuan.config.MasterConfig;
 import com.shenjiahuan.node.MasterClient;
 import com.shenjiahuan.util.Pair;
 import com.shenjiahuan.util.Utils;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -15,7 +14,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

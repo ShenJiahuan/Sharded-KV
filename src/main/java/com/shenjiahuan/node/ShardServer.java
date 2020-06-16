@@ -61,9 +61,7 @@ public class ShardServer extends GenericNode implements Runnable {
 
   public NotifyResponse start(int clientVersion, JsonObject args, boolean ignoreClientVersion) {
     try {
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       if (clientVersion != version && !ignoreClientVersion) {
         logger.info(this.hashCode() + ": not belong to");
         return new NotifyResponse(NOT_BELONG_TO, "");
@@ -72,13 +70,9 @@ public class ShardServer extends GenericNode implements Runnable {
         logger.info(this.hashCode() + ": not leader");
         return new NotifyResponse(NOT_LEADER, "");
       }
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
       int index = conn.start(args);
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       BlockingQueue<ChanMessage<NotifyResponse>> notifyChan;
       if (!chanMap.containsKey(index)) {
         notifyChan = Utils.createChan(2000);
@@ -86,10 +80,7 @@ public class ShardServer extends GenericNode implements Runnable {
       } else {
         notifyChan = chanMap.get(index);
       }
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
-
       ChanMessage<NotifyResponse> message;
       try {
         message = notifyChan.take();
@@ -99,16 +90,12 @@ public class ShardServer extends GenericNode implements Runnable {
       switch (message.getType()) {
         case SUCCESS:
           {
-            // logger.info(this.hashCode() + ": acquiring lock");
             mutex.lock();
-            // logger.info(this.hashCode() + ": acquired lock");
             return message.getData();
           }
         case TIMEOUT:
           {
-            // logger.info(this.hashCode() + ": acquiring lock");
             mutex.lock();
-            // logger.info(this.hashCode() + ": acquired lock");
             logger.info("timeout for " + args);
             return new NotifyResponse(NOT_LEADER, "");
           }
@@ -118,9 +105,7 @@ public class ShardServer extends GenericNode implements Runnable {
           }
       }
     } finally {
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
     }
   }
 
@@ -135,9 +120,7 @@ public class ShardServer extends GenericNode implements Runnable {
   public void handleChange(List<Log> newLogs, int index) {
     logger.info(this.hashCode() + ": handle change of " + index);
     try {
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       for (Log log : newLogs) {
 
         logger.info(this.hashCode() + " log: " + log);
@@ -251,9 +234,7 @@ public class ShardServer extends GenericNode implements Runnable {
         }
       }
     } finally {
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
     }
   }
 
@@ -349,25 +330,19 @@ public class ShardServer extends GenericNode implements Runnable {
 
   public Pair<StatusCode, String> migrate(int migrateVersion, List<Long> shards) {
     try {
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       if (migrateVersion >= version) {
         return new Pair<>(NOT_BELONG_TO, "");
       }
       while (!migratingShardData.containsKey(migrateVersion)
           || migratingWaiting.get(migrateVersion).size() > 0) {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         try {
           Thread.sleep(100);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        // logger.info(this.hashCode() + ": acquiring lock");
         mutex.lock();
-        // logger.info(this.hashCode() + ": acquired lock");
       }
       assert migratingShardData
           .get(migrateVersion)
@@ -395,22 +370,16 @@ public class ShardServer extends GenericNode implements Runnable {
 
       return new Pair<>(OK, data.toString());
     } finally {
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
     }
   }
 
   private void updateConfig() {
-    // logger.info(this.hashCode() + ": acquiring lock");
     mutex.lock();
-    // logger.info(this.hashCode() + ": acquired lock");
     while (!stopped.get()) {
       if (conn.isLeader()) {
         final int nextVersion = version + 1;
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         final String masterConfig = masterClient.query(nextVersion);
         if (Utils.getVersion(masterConfig) == nextVersion) {
           JsonObject data = new JsonObject();
@@ -421,9 +390,7 @@ public class ShardServer extends GenericNode implements Runnable {
                   .getAsJsonObject());
         }
       } else {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
       }
       try {
         Thread.sleep(100);
@@ -485,9 +452,7 @@ public class ShardServer extends GenericNode implements Runnable {
   }
 
   private void pull() {
-    // logger.info(this.hashCode() + ": acquiring lock");
     mutex.lock();
-    // logger.info(this.hashCode() + ": acquired lock");
     while (!stopped.get()) {
       if (conn.isLeader() && waitingShards.size() > 0) {
         final Map<Integer, List<Long>> shardsToPull =
@@ -501,9 +466,7 @@ public class ShardServer extends GenericNode implements Runnable {
           t.start();
           threads.add(t);
         }
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         for (Thread t : threads) {
           try {
             t.join();
@@ -512,9 +475,7 @@ public class ShardServer extends GenericNode implements Runnable {
           }
         }
       } else {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
       }
       try {
         Thread.sleep(100);

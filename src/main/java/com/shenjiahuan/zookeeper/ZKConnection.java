@@ -107,9 +107,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         return;
       }
 
-      // logger.info(this.hashCode() + ": acquiring lock");
       mutex.lock();
-      // logger.info(this.hashCode() + ": acquired lock");
       znodeVer.put(znode, stat.getVersion());
       if ((b == null && b != prevData) || (b != null && !Arrays.equals(prevData, b))) {
 
@@ -130,9 +128,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         prevData = b;
       }
       //      logger.info("prevData length: " + (prevData == null ? 0 : prevData.length));
-      // logger.info(this.hashCode() + ": releasing lock");
       mutex.unlock();
-      // logger.info(this.hashCode() + ": released lock");
     }
   }
 
@@ -143,9 +139,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
   public void append(JsonObject data) {
     while (true) {
       try {
-        // logger.info(this.hashCode() + ": acquiring lock");
         mutex.lock();
-        // logger.info(this.hashCode() + ": acquired lock");
         JsonArray array =
             prevData == null || prevData.length == 0
                 ? new JsonArray()
@@ -158,20 +152,14 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         } catch (KeeperException.ConnectionLossException e) {
           logger.warn("Connection lost, failed to put into " + znode);
         }
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         return;
       } catch (KeeperException.BadVersionException e) {
         logger.info("version incorrect, will retry later...");
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         Thread.yield();
       } catch (KeeperException | InterruptedException e) {
-        // logger.info(this.hashCode() + ": releasing lock");
         mutex.unlock();
-        // logger.info(this.hashCode() + ": released lock");
         e.printStackTrace();
       }
     }
