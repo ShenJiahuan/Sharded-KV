@@ -14,7 +14,7 @@ import com.shenjiahuan.log.Action;
 import com.shenjiahuan.log.Log;
 import com.shenjiahuan.rpc.ShardGrpcServer;
 import com.shenjiahuan.util.*;
-import com.shenjiahuan.zookeeper.ZKShardConnection;
+import com.shenjiahuan.zookeeper.ZKConnection;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
@@ -23,16 +23,10 @@ import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import org.apache.log4j.Logger;
 
-public class ShardServer extends GenericNode implements Runnable {
+public class ShardServer extends AbstractServer implements Runnable {
 
-  private final Logger logger = Logger.getLogger(getClass());
-  private final String url;
-  private ZKShardConnection conn;
   private final MasterClient masterClient;
   private final int shardServerPort;
   private final long gid;
@@ -47,74 +41,14 @@ public class ShardServer extends GenericNode implements Runnable {
   private final Map<Integer, Map<String, String>> migratingShardData = new HashMap<>();
   private final Map<Integer, Map<Long, Long>> migratingExecuted = new HashMap<>();
   private final Map<Integer, Map<Long, Integer>> migratingWaiting = new HashMap<>();
-  private final Lock mutex = new ReentrantLock();
   private final AtomicBoolean stopped = new AtomicBoolean(false);
-  private final Map<Integer, BlockingQueue<ChanMessage<NotifyResponse>>> chanMap = new HashMap<>();
 
   public ShardServer(
       String url, int shardServerPort, long gid, List<Pair<String, Integer>> masters) {
-    this.url = url;
+    super(url);
     this.shardServerPort = shardServerPort;
     this.gid = gid;
     this.masterClient = new MasterClient(masters);
-  }
-
-  public NotifyResponse start(int clientVersion, JsonObject args, boolean ignoreClientVersion) {
-    try {
-      mutex.lock();
-      if (clientVersion != version && !ignoreClientVersion) {
-        logger.info(this.hashCode() + ": not belong to");
-        return new NotifyResponse(NOT_BELONG_TO, "");
-      }
-      if (!conn.isLeader()) {
-        logger.info(this.hashCode() + ": not leader");
-        return new NotifyResponse(NOT_LEADER, "");
-      }
-      mutex.unlock();
-      int index = conn.start(args);
-      mutex.lock();
-      BlockingQueue<ChanMessage<NotifyResponse>> notifyChan;
-      if (!chanMap.containsKey(index)) {
-        notifyChan = Utils.createChan(2000);
-        chanMap.put(index, notifyChan);
-      } else {
-        notifyChan = chanMap.get(index);
-      }
-      mutex.unlock();
-      ChanMessage<NotifyResponse> message;
-      try {
-        message = notifyChan.take();
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-      switch (message.getType()) {
-        case SUCCESS:
-          {
-            mutex.lock();
-            return message.getData();
-          }
-        case TIMEOUT:
-          {
-            mutex.lock();
-            logger.info("timeout for " + args);
-            return new NotifyResponse(NOT_LEADER, "");
-          }
-        default:
-          {
-            throw new RuntimeException("Not handled");
-          }
-      }
-    } finally {
-      mutex.unlock();
-    }
-  }
-
-  public NotifyResponse start(int clientVersion, JsonObject args) {
-    return start(clientVersion, args, false);
-  }
-
-  public NotifyResponse start(JsonObject args) {
-    return start(0, args, true);
   }
 
   public void handleChange(List<Log> newLogs, int index) {
@@ -305,6 +239,7 @@ public class ShardServer extends GenericNode implements Runnable {
     NotifyResponse response =
         start(
             clientVersion,
+            version,
             new Gson().toJsonTree(new Log(Action.GET, data.toString())).getAsJsonObject());
 
     return new Pair<>(response.getStatusCode(), response.getData());
@@ -322,6 +257,7 @@ public class ShardServer extends GenericNode implements Runnable {
     NotifyResponse response =
         start(
             clientVersion,
+            version,
             new Gson()
                 .toJsonTree(new Log(Action.PUT_OR_DELETE, data.toString()))
                 .getAsJsonObject());
@@ -443,9 +379,7 @@ public class ShardServer extends GenericNode implements Runnable {
     for (Server server : servers) {
       final Pair<StatusCode, String> result = doPullFromServer(pullVersion, shards, server);
       if (result.getKey() == OK) {
-        start(
-            version,
-            new Gson().toJsonTree(new Log(Action.PULL, result.getValue())).getAsJsonObject());
+        start(new Gson().toJsonTree(new Log(Action.PULL, result.getValue())).getAsJsonObject());
         return;
       }
     }
@@ -504,7 +438,7 @@ public class ShardServer extends GenericNode implements Runnable {
   public void run() {
     final ShardGrpcServer grpcServer = new ShardGrpcServer(this, shardServerPort);
     grpcServer.start();
-    conn = new ZKShardConnection(url, this, "/group/" + gid, "/election/group/" + gid);
+    conn = new ZKConnection(url, this, "/group/" + gid, "/election/group/" + gid);
     try {
       conn.connect();
       Thread updateCfgTh = new Thread(this::updateConfig);

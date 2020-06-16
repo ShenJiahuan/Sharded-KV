@@ -2,10 +2,14 @@ package com.shenjiahuan.zookeeper;
 
 import static org.apache.zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL;
 
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import com.shenjiahuan.log.Log;
-import com.shenjiahuan.node.GenericNode;
+import com.shenjiahuan.node.AbstractServer;
+import com.shenjiahuan.util.Utils;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,7 +27,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
 
   private ZooKeeper zoo;
   private final String host;
-  private final GenericNode listener;
+  private final AbstractServer listener;
   private AtomicBoolean dead = new AtomicBoolean(false);
   private final String znode;
   private byte[] prevData;
@@ -37,7 +41,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
   private static final String PROCESS_NODE_PREFIX = "/p_";
 
   public ZKConnection(
-      String host, GenericNode listener, String znode, String leaderElectionRootNode) {
+      String host, AbstractServer listener, String znode, String leaderElectionRootNode) {
     this.host = host;
     this.listener = listener;
     this.znode = znode;
@@ -123,11 +127,10 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         List<Log> logDiff = new ArrayList<>(currentLog.subList(prevLog.size(), currentLog.size()));
 
         if (logDiff.size() > 0) {
-          listener.handleChange(logDiff, 0);
+          listener.handleChange(logDiff, stat.getVersion());
         }
         prevData = b;
       }
-      //      logger.info("prevData length: " + (prevData == null ? 0 : prevData.length));
       mutex.unlock();
     }
   }
@@ -136,7 +139,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
     return dead.get();
   }
 
-  public void append(JsonObject data) {
+  public int start(JsonObject data) {
     while (true) {
       try {
         mutex.lock();
@@ -152,12 +155,13 @@ public class ZKConnection implements AsyncCallback.StatCallback {
         } catch (KeeperException.ConnectionLossException e) {
           logger.warn("Connection lost, failed to put into " + znode);
         }
+        int index = znodeVer.get(znode) + 1;
         mutex.unlock();
-        return;
+        return index;
       } catch (KeeperException.BadVersionException e) {
         logger.info("version incorrect, will retry later...");
         mutex.unlock();
-        Thread.yield();
+        Utils.sleep(100);
       } catch (KeeperException | InterruptedException e) {
         mutex.unlock();
         e.printStackTrace();

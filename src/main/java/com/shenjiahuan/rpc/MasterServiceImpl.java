@@ -3,6 +3,7 @@ package com.shenjiahuan.rpc;
 import com.shenjiahuan.*;
 import com.shenjiahuan.node.Master;
 import com.shenjiahuan.util.Pair;
+import com.shenjiahuan.util.StatusCode;
 import io.grpc.stub.StreamObserver;
 import org.apache.log4j.Logger;
 
@@ -29,9 +30,9 @@ public class MasterServiceImpl extends MasterServiceGrpc.MasterServiceImplBase {
       logger.info("gid: " + gid + ", server: " + server);
     }
 
-    final int err = master.join(gid, serverList, clientId, seqId);
+    final StatusCode statusCode = master.join(gid, serverList, clientId, seqId);
 
-    JoinResponse response = JoinResponse.newBuilder().setStatus(err).build();
+    JoinResponse response = JoinResponse.newBuilder().setStatus(statusCode.getCode()).build();
 
     responseObserver.onNext(response);
     responseObserver.onCompleted();
@@ -46,9 +47,9 @@ public class MasterServiceImpl extends MasterServiceGrpc.MasterServiceImplBase {
 
     logger.info("gid: " + gid);
 
-    final int err = master.leave(gid, clientId, seqId);
+    final StatusCode statusCode = master.leave(gid, clientId, seqId);
 
-    LeaveResponse response = LeaveResponse.newBuilder().setStatus(err).build();
+    LeaveResponse response = LeaveResponse.newBuilder().setStatus(statusCode.getCode()).build();
 
     responseObserver.onNext(response);
     responseObserver.onCompleted();
@@ -63,11 +64,12 @@ public class MasterServiceImpl extends MasterServiceGrpc.MasterServiceImplBase {
 
     logger.info("version: " + version);
 
-    final Pair<Integer, String> result = master.query(version, clientId, seqId);
-    final int err = result.getKey();
+    final Pair<StatusCode, String> result = master.query(version, clientId, seqId);
+    final StatusCode statusCode = result.getKey();
     final String data = result.getValue();
 
-    QueryResponse response = QueryResponse.newBuilder().setStatus(err).setData(data).build();
+    QueryResponse response =
+        QueryResponse.newBuilder().setStatus(statusCode.getCode()).setData(data).build();
 
     responseObserver.onNext(response);
     responseObserver.onCompleted();
@@ -83,9 +85,9 @@ public class MasterServiceImpl extends MasterServiceGrpc.MasterServiceImplBase {
 
     logger.info("shardId: " + shardId + ", gid: " + gid);
 
-    final int err = master.move(shardId, gid, clientId, seqId);
+    final StatusCode statusCode = master.move(shardId, gid, clientId, seqId);
 
-    MoveResponse response = MoveResponse.newBuilder().setStatus(err).build();
+    MoveResponse response = MoveResponse.newBuilder().setStatus(statusCode.getCode()).build();
 
     responseObserver.onNext(response);
     responseObserver.onCompleted();

@@ -1,5 +1,7 @@
 package com.shenjiahuan.node;
 
+import static com.shenjiahuan.util.StatusCode.*;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -9,85 +11,103 @@ import com.shenjiahuan.config.MasterConfig;
 import com.shenjiahuan.log.Action;
 import com.shenjiahuan.log.Log;
 import com.shenjiahuan.rpc.MasterGrpcServer;
-import com.shenjiahuan.util.Pair;
+import com.shenjiahuan.util.*;
 import com.shenjiahuan.zookeeper.ZKConnection;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.log4j.Logger;
+import java.util.concurrent.BlockingQueue;
 
-public class Master extends GenericNode implements Runnable {
+public class Master extends AbstractServer implements Runnable {
 
-  private final Logger logger = Logger.getLogger(getClass());
-  private ZKConnection conn;
   private final MasterConfig masterConfig = new MasterConfig();
-  private final String url;
   private final int masterPort;
-  private final Map<Long, Long> lastExecuted = new ConcurrentHashMap<>();
 
   public Master(String url, int masterPort) {
-    this.url = url;
+    super(url);
     this.masterPort = masterPort;
   }
 
   public void handleChange(List<Log> newLogs, int index) {
-    // TODO: What if same client send concurrent requests?
-    for (Log log : newLogs) {
-      JsonObject logData = JsonParser.parseString(log.getData()).getAsJsonObject();
-      switch (log.getAction()) {
-        case JOIN:
-          {
-            final long gid = logData.get("gid").getAsLong();
-            final List<Server> serverList =
-                new Gson().fromJson(logData.get("serverList"), ServerList.class).getServerList();
-            final Long clientId = logData.get("clientId").getAsLong();
-            final Long seqId = logData.get("seqId").getAsLong();
-            final Long last = lastExecuted.get(clientId);
-            if (last == null || last < seqId) {
-              handleJoin(gid, serverList);
-              lastExecuted.put(clientId, seqId);
+    logger.info(this.hashCode() + ": handle change of " + index);
+    try {
+      mutex.lock();
+      for (Log log : newLogs) {
+
+        logger.info(this.hashCode() + " log: " + log);
+        NotifyResponse response = new NotifyResponse(OK, "");
+        JsonObject logData = JsonParser.parseString(log.getData()).getAsJsonObject();
+        switch (log.getAction()) {
+          case JOIN:
+            {
+              final long gid = logData.get("gid").getAsLong();
+              final List<Server> serverList =
+                  new Gson().fromJson(logData.get("serverList"), ServerList.class).getServerList();
+              final Long clientId = logData.get("clientId").getAsLong();
+              final Long seqId = logData.get("seqId").getAsLong();
+              final Long last = executed.get(clientId);
+              if (last == null || last < seqId) {
+                handleJoin(gid, serverList);
+                executed.put(clientId, seqId);
+              }
+              break;
             }
-            break;
-          }
-        case LEAVE:
-          {
-            final long gid = logData.get("gid").getAsLong();
-            final Long clientId = logData.get("clientId").getAsLong();
-            final Long seqId = logData.get("seqId").getAsLong();
-            final Long last = lastExecuted.get(clientId);
-            if (last == null || last < seqId) {
-              handleLeave(gid);
-              lastExecuted.put(clientId, seqId);
+          case LEAVE:
+            {
+              final long gid = logData.get("gid").getAsLong();
+              final Long clientId = logData.get("clientId").getAsLong();
+              final Long seqId = logData.get("seqId").getAsLong();
+              final Long last = executed.get(clientId);
+              if (last == null || last < seqId) {
+                handleLeave(gid);
+                executed.put(clientId, seqId);
+              }
+              break;
             }
-            break;
-          }
-        case QUERY:
-          {
-            final Long clientId = logData.get("clientId").getAsLong();
-            final Long seqId = logData.get("seqId").getAsLong();
-            final Long last = lastExecuted.get(clientId);
-            if (last == null || last < seqId) {
-              lastExecuted.put(clientId, seqId);
+          case QUERY:
+            {
+              final Long clientId = logData.get("clientId").getAsLong();
+              final Long seqId = logData.get("seqId").getAsLong();
+              final int version = logData.get("version").getAsInt();
+              final Long last = executed.get(clientId);
+              if (last == null || last < seqId) {
+                executed.put(clientId, seqId);
+                response.setData(masterConfig.getConfig(version));
+              }
+              break;
             }
-            break;
-          }
-        case MOVE:
-          {
-            final Long shardId = logData.get("shardId").getAsLong();
-            final Long gid = logData.get("gid").getAsLong();
-            final Long clientId = logData.get("clientId").getAsLong();
-            final Long seqId = logData.get("seqId").getAsLong();
-            final Long last = lastExecuted.get(clientId);
-            if (last == null || last < seqId) {
-              handleMove(shardId, gid);
-              lastExecuted.put(clientId, seqId);
+          case MOVE:
+            {
+              final Long shardId = logData.get("shardId").getAsLong();
+              final Long gid = logData.get("gid").getAsLong();
+              final Long clientId = logData.get("clientId").getAsLong();
+              final Long seqId = logData.get("seqId").getAsLong();
+              final Long last = executed.get(clientId);
+              if (last == null || last < seqId) {
+                handleMove(shardId, gid);
+                executed.put(clientId, seqId);
+              }
+              break;
             }
-            break;
+          default:
+            throw new RuntimeException("Unhandled action");
+        }
+
+        logger.info("master response: " + response);
+
+        if (conn.isLeader() && newLogs.size() == 1) {
+          // if newLogs.size() != 1, this is a replay, and no one is waiting for the result
+          BlockingQueue<ChanMessage<NotifyResponse>> chan;
+          if (chanMap.containsKey(index)) {
+            chan = chanMap.get(index);
+          } else {
+            chan = Utils.createChan(2000);
+            chanMap.put(index, chan);
           }
-        default:
-          throw new RuntimeException("Unhandled action");
+          chan.offer(new ChanMessage<>(ChanMessageType.SUCCESS, response));
+        }
       }
+    } finally {
+      mutex.unlock();
     }
   }
 
@@ -103,12 +123,8 @@ public class Master extends GenericNode implements Runnable {
     masterConfig.moveShard(shardId, gid);
   }
 
-  public int join(Long gid, ServerList serverList, Long clientId, Long seqId) {
-    if (!conn.isLeader()) {
-      return 1;
-    }
-
-    logger.info(Thread.currentThread().getId() + ": group " + gid + " joined");
+  public StatusCode join(Long gid, ServerList serverList, Long clientId, Long seqId) {
+    logger.info(this.hashCode() + ": group " + gid + " joined");
 
     final JsonObject jsonData = new JsonObject();
     jsonData.addProperty("gid", gid);
@@ -116,47 +132,43 @@ public class Master extends GenericNode implements Runnable {
     jsonData.addProperty("clientId", clientId);
     jsonData.addProperty("seqId", seqId);
     final String data = jsonData.toString();
-    conn.append(new Gson().toJsonTree(new Log(Action.JOIN, data)).getAsJsonObject());
+    final NotifyResponse response =
+        start(new Gson().toJsonTree(new Log(Action.JOIN, data)).getAsJsonObject());
 
-    return 0;
+    return response.getStatusCode();
   }
 
-  public int leave(Long gid, Long clientId, Long seqId) {
-    if (!conn.isLeader()) {
-      return 1;
-    }
+  public StatusCode leave(Long gid, Long clientId, Long seqId) {
+    logger.info(this.hashCode() + ": group " + gid + " left");
 
     final JsonObject jsonData = new JsonObject();
     jsonData.addProperty("gid", gid);
     jsonData.addProperty("clientId", clientId);
     jsonData.addProperty("seqId", seqId);
     final String data = jsonData.toString();
-    conn.append(new Gson().toJsonTree(new Log(Action.LEAVE, data)).getAsJsonObject());
-    return 0;
+    final NotifyResponse response =
+        start(new Gson().toJsonTree(new Log(Action.LEAVE, data)).getAsJsonObject());
+
+    return response.getStatusCode();
   }
 
-  // TODO: Do I handle resent quries correctly? They will be logged twice.
-  public Pair<Integer, String> query(int version, Long clientId, Long seqId) {
-    if (!conn.isLeader()) {
-      return new Pair<>(1, "");
-    }
-
+  public Pair<StatusCode, String> query(int version, Long clientId, Long seqId) {
     if (version < 0 || version >= masterConfig.getCurrentVersion()) {
       final JsonObject jsonData = new JsonObject();
       jsonData.addProperty("version", version);
       jsonData.addProperty("clientId", clientId);
       jsonData.addProperty("seqId", seqId);
       final String data = jsonData.toString();
-      conn.append(new Gson().toJsonTree(new Log(Action.QUERY, data)).getAsJsonObject());
+      final NotifyResponse response =
+          start(new Gson().toJsonTree(new Log(Action.QUERY, data)).getAsJsonObject());
+      return new Pair<>(response.getStatusCode(), response.getData());
+    } else {
+      final String config = masterConfig.getConfig(version);
+      return new Pair<>(OK, config);
     }
-    final String config = masterConfig.getConfig(version);
-    return new Pair<>(0, config);
   }
 
-  public int move(Long shardId, Long gid, Long clientId, Long seqId) {
-    if (!conn.isLeader()) {
-      return 1;
-    }
+  public StatusCode move(Long shardId, Long gid, Long clientId, Long seqId) {
 
     final JsonObject jsonData = new JsonObject();
     jsonData.addProperty("shardId", shardId);
@@ -164,8 +176,9 @@ public class Master extends GenericNode implements Runnable {
     jsonData.addProperty("clientId", clientId);
     jsonData.addProperty("seqId", seqId);
     final String data = jsonData.toString();
-    conn.append(new Gson().toJsonTree(new Log(Action.MOVE, data)).getAsJsonObject());
-    return 0;
+    final NotifyResponse response =
+        start(new Gson().toJsonTree(new Log(Action.MOVE, data)).getAsJsonObject());
+    return response.getStatusCode();
   }
 
   @Override
