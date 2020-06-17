@@ -193,7 +193,7 @@ public class Master extends AbstractServer implements Runnable {
   public void run() {
     final MasterGrpcServer grpcServer = new MasterGrpcServer(this, masterPort);
     grpcServer.start();
-    conn = new ZKConnection(url, this, "/test", "/election/master");
+    conn = new ZKConnection(url, this, "/master", "/election/master");
     try {
       conn.connect();
       synchronized (this) {

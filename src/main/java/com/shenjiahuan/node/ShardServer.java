@@ -31,17 +31,21 @@ public class ShardServer extends AbstractServer implements Runnable {
   private final int shardServerPort;
   private final long gid;
   private int version = -1;
+  private final AtomicBoolean stopped = new AtomicBoolean(false);
+
   private Map<Long, List<Server>> groupMap = new HashMap<>();
   private Map<Long, List<Long>> shardMap = new HashMap<>();
+
   private final Map<Integer, Map<Long, List<Server>>> historyGroupMap = new HashMap<>();
   private final Map<Integer, Map<Long, List<Long>>> historyShardMap = new HashMap<>();
+
   private Map<String, String> shardData = new HashMap<>();
-  private final Map<Long, Integer> waitingShards = new HashMap<>();
   private final Map<Long, Long> executed = new HashMap<>();
+  private final Map<Long, Integer> waitingShards = new HashMap<>();
+
   private final Map<Integer, Map<String, String>> migratingShardData = new HashMap<>();
   private final Map<Integer, Map<Long, Long>> migratingExecuted = new HashMap<>();
   private final Map<Integer, Map<Long, Integer>> migratingWaiting = new HashMap<>();
-  private final AtomicBoolean stopped = new AtomicBoolean(false);
 
   public ShardServer(
       String url, int shardServerPort, long gid, List<Pair<String, Integer>> masters) {
