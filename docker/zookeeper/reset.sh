@@ -1,0 +1,22 @@
+#! /bin/bash
+zookeeper/bin/zkCli.sh<<EOF
+deleteall /group
+delete /group/0
+delete /group/1
+delete /group/2
+delete /master
+create /group
+create /group/0
+create /group/1
+create /group/2
+create /master
+create /election
+create /election/group
+deleteall /election/group/0
+deleteall /election/group/1
+deleteall /election/group/2
+deleteall /election/master
+create /election/group/0
+create /election/group/1
+create /election/group/2
+create /election/master

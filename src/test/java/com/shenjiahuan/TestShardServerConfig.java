@@ -36,7 +36,7 @@ public class TestShardServerConfig extends TestMasterConfig {
       for (int i = 0; i < serverPerGroup; i++) {
         final ShardServer shardServer =
             new ShardServer(
-                "localhost:21811",
+                "localhost:21811,localhost:21812,localhost:21813",
                 shardServerPorts.get(gid).get(i),
                 gid,
                 masterPorts
@@ -80,7 +80,7 @@ public class TestShardServerConfig extends TestMasterConfig {
     for (int i = 0; i < serverPerGroup; i++) {
       final ShardServer shardServer =
           new ShardServer(
-              "localhost:21811",
+              "localhost:21811,localhost:21812,localhost:21813",
               shardServerPorts.get(gid).get(i),
               gid,
               masterPorts
@@ -95,7 +95,7 @@ public class TestShardServerConfig extends TestMasterConfig {
   public void startServer(int gid, int i) {
     final ShardServer shardServer =
         new ShardServer(
-            "localhost:21811",
+            "localhost:21811,localhost:21812,localhost:21813",
             shardServerPorts.get(gid).get(i),
             gid,
             masterPorts

@@ -23,14 +23,18 @@ public class ShardServerTest {
 
   private final Logger logger = Logger.getLogger(getClass());
 
-  public boolean check(ShardClient client, String key, String expectedValue) {
+  public boolean check(ShardClient client, String key, String expectedValue, long t) {
     AtomicReference<String> actualValue = new AtomicReference<>();
     boolean timeout = true;
     for (int i = 0; i < 3; i++) {
       Thread thread = new Thread(() -> actualValue.set(client.get(key)));
       thread.start();
       try {
-        thread.join(5000);
+        if (t == 0) {
+          thread.join();
+        } else {
+          thread.join(5000);
+        }
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
@@ -98,7 +102,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     for (int i = 0; i < n; i++) {
@@ -109,7 +113,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     for (int i = 0; i < n; i++) {
@@ -123,7 +127,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
@@ -168,7 +172,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.shutDownGroup(1);
@@ -181,7 +185,7 @@ public class ShardServerTest {
       final String value = values.get(i);
       new Thread(
               () -> {
-                if (check(client1, key, value)) {
+                if (check(client1, key, value, 5000)) {
                   nPass.incrementAndGet();
                 }
                 nDone.incrementAndGet();
@@ -202,7 +206,7 @@ public class ShardServerTest {
 
     config.startGroup(1);
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
@@ -246,13 +250,13 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.joinGroup(1);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = keys.get(i);
       byte[] bytes = new byte[5];
@@ -266,7 +270,7 @@ public class ShardServerTest {
     config.leaveGroup(0);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = keys.get(i);
       byte[] bytes = new byte[5];
@@ -285,7 +289,7 @@ public class ShardServerTest {
     config.shutDownGroup(0);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
@@ -329,7 +333,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.joinGroup(1);
@@ -337,7 +341,7 @@ public class ShardServerTest {
     config.leaveGroup(0);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = keys.get(i);
       byte[] bytes = new byte[20];
@@ -352,7 +356,7 @@ public class ShardServerTest {
     config.joinGroup(0);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = keys.get(i);
       byte[] bytes = new byte[20];
@@ -370,7 +374,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     try {
@@ -388,7 +392,7 @@ public class ShardServerTest {
     config.startGroup(2);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
@@ -432,7 +436,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.joinGroup(1);
@@ -446,7 +450,7 @@ public class ShardServerTest {
     config.leaveGroup(0);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = String.valueOf(i);
       byte[] bytes = new byte[20];
@@ -460,7 +464,7 @@ public class ShardServerTest {
     config.joinGroup(1);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = String.valueOf(i);
       byte[] bytes = new byte[20];
@@ -476,7 +480,7 @@ public class ShardServerTest {
     config.startServer(2, 0);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = String.valueOf(i);
       byte[] bytes = new byte[20];
@@ -501,7 +505,7 @@ public class ShardServerTest {
     config.leaveGroup(2);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
 
       final String key = String.valueOf(i);
       byte[] bytes = new byte[20];
@@ -517,7 +521,7 @@ public class ShardServerTest {
     config.startServer(2, 1);
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
@@ -570,7 +574,7 @@ public class ShardServerTest {
               () -> {
                 final ShardClient client1 = config.createShardClient();
                 while (!done.get()) {
-                  assertTrue(check(client, keys.get(index), values.get(index)));
+                  assertTrue(check(client, keys.get(index), values.get(index), 0));
                   final String key = String.valueOf(index);
                   byte[] bytes = new byte[20];
                   new Random().nextBytes(bytes);
@@ -624,7 +628,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
@@ -681,7 +685,7 @@ public class ShardServerTest {
               () -> {
                 final ShardClient client1 = config.createShardClient();
                 while (!done.get()) {
-                  assertTrue(check(client, keys.get(index), values.get(index)));
+                  assertTrue(check(client, keys.get(index), values.get(index), 5000));
                   final String key = String.valueOf(index);
                   byte[] bytes = new byte[20];
                   new Random().nextBytes(bytes);
@@ -727,7 +731,7 @@ public class ShardServerTest {
     }
 
     for (int i = 0; i < n; i++) {
-      assertTrue(check(client, keys.get(i), values.get(i)));
+      assertTrue(check(client, keys.get(i), values.get(i), 0));
     }
 
     config.cleanUp();
