@@ -39,7 +39,8 @@ public class TestMasterConfig {
   }
 
   public void startMaster(int masterId) {
-    Master master = new Master("localhost:21811,localhost:21812,localhost:21813", masterPorts.get(masterId));
+    Master master =
+        new Master("localhost:21811,localhost:21812,localhost:21813", masterPorts.get(masterId));
     new Thread(master).start();
     masters.set(masterId, master);
   }

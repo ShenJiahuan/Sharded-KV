@@ -103,14 +103,14 @@ public class ShardKV {
           break;
         }
       case "leave":
-      {
-        if (gid == null) {
-          System.out.println("Invalid arguments");
-          System.exit(1);
+        {
+          if (gid == null) {
+            System.out.println("Invalid arguments");
+            System.exit(1);
+          }
+          client.leave(gid);
+          break;
         }
-        client.leave(gid);
-        break;
-      }
     }
   }
 
