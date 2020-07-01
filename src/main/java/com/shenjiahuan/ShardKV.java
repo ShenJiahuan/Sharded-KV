@@ -37,7 +37,7 @@ public class ShardKV {
 
     parser.addArgument("-s", "--shardservers");
 
-    parser.addArgument("-a", "--action").choices("join");
+    parser.addArgument("-a", "--action").choices("join", "leave");
 
     Namespace ns = null;
     try {
@@ -102,6 +102,15 @@ public class ShardKV {
           client.join(gid, shardServerList);
           break;
         }
+      case "leave":
+      {
+        if (gid == null) {
+          System.out.println("Invalid arguments");
+          System.exit(1);
+        }
+        client.leave(gid);
+        break;
+      }
     }
   }
 
