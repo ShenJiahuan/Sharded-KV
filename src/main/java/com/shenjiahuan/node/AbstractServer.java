@@ -61,17 +61,17 @@ public abstract class AbstractServer {
       try {
         message = notifyChan.take();
       } catch (InterruptedException e) {
+        mutex.lock();
         throw new RuntimeException(e);
       }
+      mutex.lock();
       switch (message.getType()) {
         case SUCCESS:
           {
-            mutex.lock();
             return message.getData();
           }
         case TIMEOUT:
           {
-            mutex.lock();
             logger.info("timeout for " + args);
             return new NotifyResponse(NOT_LEADER, "");
           }
@@ -81,7 +81,9 @@ public abstract class AbstractServer {
           }
       }
     } finally {
-      mutex.unlock();
+      if (((ReentrantLock) mutex).isHeldByCurrentThread()) {
+        mutex.unlock();
+      }
     }
   }
 
