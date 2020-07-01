@@ -5,6 +5,8 @@ import com.shenjiahuan.node.MasterClient;
 import com.shenjiahuan.node.ShardClient;
 import com.shenjiahuan.node.ShardServer;
 import com.shenjiahuan.util.Pair;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -120,6 +122,11 @@ public class ShardKV {
       System.exit(1);
     }
     ShardClient client = new ShardClient(masterList);
+    System.setErr(
+        new PrintStream(
+            new OutputStream() {
+              public void write(int b) {}
+            }));
     client.interactive();
   }
 
