@@ -9,14 +9,14 @@ ZOO3_IP=10.0.1.3
 MASTER1_IP=10.0.2.1
 MASTER2_IP=10.0.2.2
 
-SHARDSERVER11_IP=10.0.3.1
-SHARDSERVER12_IP=10.0.3.2
+SHARDSERVER01_IP=10.0.3.1
+SHARDSERVER02_IP=10.0.3.2
 
-SHARDSERVER21_IP=10.0.4.1
-SHARDSERVER22_IP=10.0.4.2
+SHARDSERVER11_IP=10.0.4.1
+SHARDSERVER12_IP=10.0.4.2
 
-SHARDSERVER31_IP=10.0.5.1
-SHARDSERVER32_IP=10.0.5.2
+SHARDSERVER21_IP=10.0.5.1
+SHARDSERVER22_IP=10.0.5.2
 
 ZK_SERVER="${ZOO1_IP},${ZOO2_IP},${ZOO3_IP}"
 
@@ -27,14 +27,14 @@ docker rm -f zoo3 > /dev/null 2>&1
 docker rm -f master1 > /dev/null 2>&1
 docker rm -f master2 > /dev/null 2>&1
 
+docker rm -f shardserver01 > /dev/null 2>&1
+docker rm -f shardserver02 > /dev/null 2>&1
+
 docker rm -f shardserver11 > /dev/null 2>&1
 docker rm -f shardserver12 > /dev/null 2>&1
 
 docker rm -f shardserver21 > /dev/null 2>&1
 docker rm -f shardserver22 > /dev/null 2>&1
-
-docker rm -f shardserver31 > /dev/null 2>&1
-docker rm -f shardserver32 > /dev/null 2>&1
 
 docker network rm kv
 
@@ -53,17 +53,17 @@ docker exec zoo1 /reset.sh
 docker run --name master1 --hostname master1 --network kv --ip ${MASTER1_IP} -d -it shenjiahuan:kv -t master -p 2000 -zk zoo1:2181
 docker run --name master2 --hostname master2 --network kv --ip ${MASTER2_IP} -d -it shenjiahuan:kv -t master -p 2000 -zk zoo1:2181
 
-docker run --name shardserver11 --hostname shardserver11 --network kv --ip ${SHARDSERVER11_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 0 -m "master1:2000;master2:2000"
-docker run --name shardserver12 --hostname shardserver12 --network kv --ip ${SHARDSERVER12_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 0 -m "master1:2000;master2:2000"
+docker run --name shardserver01 --hostname shardserver01 --network kv --ip ${SHARDSERVER01_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 0 -m "master1:2000;master2:2000"
+docker run --name shardserver02 --hostname shardserver02 --network kv --ip ${SHARDSERVER02_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 0 -m "master1:2000;master2:2000"
 
-docker run --name shardserver21 --hostname shardserver21 --network kv --ip ${SHARDSERVER21_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 1 -m "master1:2000;master2:2000"
-docker run --name shardserver22 --hostname shardserver22 --network kv --ip ${SHARDSERVER22_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 1 -m "master1:2000;master2:2000"
+docker run --name shardserver11 --hostname shardserver11 --network kv --ip ${SHARDSERVER11_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 1 -m "master1:2000;master2:2000"
+docker run --name shardserver12 --hostname shardserver12 --network kv --ip ${SHARDSERVER12_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 1 -m "master1:2000;master2:2000"
 
-docker run --name shardserver31 --hostname shardserver31 --network kv --ip ${SHARDSERVER31_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 2 -m "master1:2000;master2:2000"
-docker run --name shardserver32 --hostname shardserver32 --network kv --ip ${SHARDSERVER32_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 2 -m "master1:2000;master2:2000"
+docker run --name shardserver21 --hostname shardserver21 --network kv --ip ${SHARDSERVER21_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 2 -m "master1:2000;master2:2000"
+docker run --name shardserver22 --hostname shardserver22 --network kv --ip ${SHARDSERVER22_IP} -d -it shenjiahuan:kv -t shardserver -p 10000 -zk zoo1:2181 -g 2 -m "master1:2000;master2:2000"
 
-docker run --rm --network kv -d -it shenjiahuan:kv -t masterclient -a join -g 0 -m "master1:2000;master2:2000" -s "shardserver11:10000;shardserver12:10000"
-docker run --rm --network kv -d -it shenjiahuan:kv -t masterclient -a join -g 1 -m "master1:2000;master2:2000" -s "shardserver21:10000;shardserver22:10000"
-docker run --rm --network kv -d -it shenjiahuan:kv -t masterclient -a join -g 2 -m "master1:2000;master2:2000" -s "shardserver31:10000;shardserver32:10000"
+docker run --rm --network kv -d -it shenjiahuan:kv -t masterclient -a join -g 0 -m "master1:2000;master2:2000" -s "shardserver01:10000;shardserver02:10000"
+docker run --rm --network kv -d -it shenjiahuan:kv -t masterclient -a join -g 1 -m "master1:2000;master2:2000" -s "shardserver11:10000;shardserver12:10000"
+docker run --rm --network kv -d -it shenjiahuan:kv -t masterclient -a join -g 2 -m "master1:2000;master2:2000" -s "shardserver21:10000;shardserver22:10000"
 
 docker run --rm --network kv -it shenjiahuan:kv -t shardclient -m "master1:2000;master2:2000"
