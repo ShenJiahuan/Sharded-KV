@@ -49,9 +49,8 @@ public class MasterTest {
   @BeforeEach
   private void setUp() throws IOException, InterruptedException {
     final Process p = Runtime.getRuntime().exec("docker exec zoo1 ./reset.sh");
-    String s;
     BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-    while ((s = br.readLine()) != null) System.out.println(s);
+    while (br.readLine() != null) ;
     p.waitFor();
     p.destroy();
   }

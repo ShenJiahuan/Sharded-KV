@@ -440,11 +440,11 @@ public class ShardServer extends AbstractServer implements Runnable {
 
   @Override
   public void run() {
-    final ShardGrpcServer grpcServer = new ShardGrpcServer(this, shardServerPort);
-    grpcServer.start();
     conn = new ZKConnection(url, this, "/group/" + gid, "/election/group/" + gid);
     try {
       conn.connect();
+      final ShardGrpcServer grpcServer = new ShardGrpcServer(this, shardServerPort);
+      grpcServer.start();
       Thread updateCfgTh = new Thread(this::updateConfig);
       Thread pullDataTh = new Thread(this::pull);
       updateCfgTh.start();

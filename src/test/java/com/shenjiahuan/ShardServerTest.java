@@ -58,9 +58,8 @@ public class ShardServerTest {
   @BeforeEach
   private void setUp() throws IOException, InterruptedException {
     final Process p = Runtime.getRuntime().exec("docker exec zoo1 ./reset.sh");
-    String s;
     BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-    while ((s = br.readLine()) != null) System.out.println(s);
+    while (br.readLine() != null) ;
     p.waitFor();
     p.destroy();
   }
@@ -639,8 +638,6 @@ public class ShardServerTest {
   @Test
   public void testConcurrent2() {
     System.out.println("Test: more concurrent puts and configuration changes...");
-
-    System.out.println("Test: concurrent puts and configuration changes...");
 
     final TestShardServerConfig config =
         new TestShardServerConfig(

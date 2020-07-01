@@ -52,7 +52,7 @@ public class ZKConnection implements AsyncCallback.StatCallback {
     zoo =
         new ZooKeeper(
             host,
-            15000,
+            3000,
             event -> {
               String path = event.getPath();
               if (event.getType() == Watcher.Event.EventType.None) {

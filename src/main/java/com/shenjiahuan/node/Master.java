@@ -191,13 +191,11 @@ public class Master extends AbstractServer implements Runnable {
 
   @Override
   public void run() {
-    mutex.lock();
-    final MasterGrpcServer grpcServer = new MasterGrpcServer(this, masterPort);
-    grpcServer.start();
     conn = new ZKConnection(url, this, "/master", "/election/master");
     try {
       conn.connect();
-      mutex.unlock();
+      final MasterGrpcServer grpcServer = new MasterGrpcServer(this, masterPort);
+      grpcServer.start();
       synchronized (this) {
         while (!conn.isDead()) {
           wait();
